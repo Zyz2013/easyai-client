@@ -80,6 +80,13 @@ Log in with the website account. Keep this window open when you want the website
 
 Use `/help` inside EasyAI to see all local commands.
 
+At first startup, choose `zh` or `en`. The choice is saved locally, so later startups do not ask again. Change it later with:
+
+```text
+/language zh
+/language en
+```
+
 ## Updates
 
 When installed with Git, EasyAI checks `origin/main` every time it starts. If a new version is available, it asks before running:
@@ -89,7 +96,7 @@ git pull --ff-only origin main
 python -m pip install -e .
 ```
 
-If the folder is not a Git clone, automatic update is skipped.
+If the network is unavailable or the folder is not a Git clone, automatic update is skipped and EasyAI continues starting normally.
 
 ## Login
 

@@ -280,9 +280,11 @@ class EasyAIClient:
             self._ask_local_ai(user_input)
 
     def _choose_language(self) -> None:
-        saved = str(self.session.get("language", "zh")).lower()
-        default = saved if saved in LANGUAGES else "zh"
-        choice = Prompt.ask("Language / 语言", choices=["zh", "en"], default=default)
+        saved = str(self.session.get("language", "")).lower()
+        if saved in LANGUAGES:
+            self.language = saved
+            return
+        choice = Prompt.ask("Language / 语言", choices=["zh", "en"], default="zh")
         self.language = choice
         self.session["language"] = choice
         save_client_session(self.root, self.session)
@@ -297,6 +299,8 @@ class EasyAIClient:
             status = self.updater.check()
         except Exception as exc:
             self.console.print("[yellow]%s[/] %s" % (self._t("update_unavailable"), exc))
+            return
+        if status.offline:
             return
         if status.message:
             self.console.print("[yellow]%s[/] %s" % (self._t("update_unavailable"), status.message))

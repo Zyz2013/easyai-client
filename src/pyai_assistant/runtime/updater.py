@@ -12,6 +12,7 @@ class UpdateStatus:
     local_revision: str
     remote_revision: str
     message: str = ""
+    offline: bool = False
 
 
 class GitUpdater:
@@ -25,7 +26,10 @@ class GitUpdater:
         if not self.is_git_install():
             return UpdateStatus(False, "", "", "Not a Git install; automatic update is unavailable.")
         local = self._git(["rev-parse", "HEAD"])
-        self._git(["fetch", "--quiet", "origin", "main"])
+        try:
+            self._git(["fetch", "--quiet", "origin", "main"])
+        except RuntimeError as exc:
+            return UpdateStatus(False, local[:7], "", str(exc), offline=True)
         remote = self._git(["rev-parse", "origin/main"])
         return UpdateStatus(local != remote, local[:7], remote[:7])
 
