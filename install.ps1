@@ -38,7 +38,7 @@ function Select-Preset {
     $value = $Requested.Trim().ToLower()
     if ($value) { return $value }
     if ($NonInteractive) { return "deepseek" }
-    Write-Host "Select model preset / 选择模型预设:" -ForegroundColor Yellow
+    Write-Host "Select model preset:" -ForegroundColor Yellow
     Write-Host "  1) deepseek    DeepSeek API"
     Write-Host "  2) openrouter  OpenRouter API"
     Write-Host "  3) openai      OpenAI API"
