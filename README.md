@@ -12,6 +12,7 @@ It includes the original local EasyAI features:
 - terminal pet
 - web task polling from the central server
 - explicit permission modes through `/permission`
+- update checking on every startup when installed from Git
 
 Users run:
 
@@ -78,6 +79,17 @@ or:
 Log in with the website account. Keep this window open when you want the website to operate this computer.
 
 Use `/help` inside EasyAI to see all local commands.
+
+## Updates
+
+When installed with Git, EasyAI checks `origin/main` every time it starts. If a new version is available, it asks before running:
+
+```powershell
+git pull --ff-only origin main
+python -m pip install -e .
+```
+
+If the folder is not a Git clone, automatic update is skipped.
 
 ## Login
 

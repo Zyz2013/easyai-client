@@ -27,6 +27,7 @@ from pyai_assistant.providers.server_api import (
 from pyai_assistant.runtime.computer import load_computer_identity
 from pyai_assistant.runtime.downloader import SoftwareDownloader, looks_like_download_request, parse_download_request
 from pyai_assistant.runtime.executor import PythonRunner
+from pyai_assistant.runtime.updater import GitUpdater
 from pyai_assistant.types import AssistantResult, RunRequest
 from pyai_assistant.workspace.manager import WorkspaceManager
 
@@ -84,6 +85,12 @@ TEXT = {
         "help": "帮助",
         "client_title": "EasyAI 客户端",
         "help_title": "帮助",
+        "update_check": "正在检查更新...",
+        "update_unavailable": "无法自动检查更新:",
+        "update_available": "发现新版本 {local} -> {remote}，是否现在更新？",
+        "update_done": "更新完成。请重新打开 EasyAI。",
+        "update_failed": "更新失败:",
+        "update_none": "已是最新版本。",
     },
     "en": {
         "first_login": "First login requires server verification.",
@@ -134,6 +141,12 @@ TEXT = {
         "help": "Help",
         "client_title": "EasyAI Client",
         "help_title": "Help",
+        "update_check": "Checking for updates...",
+        "update_unavailable": "Automatic update check unavailable:",
+        "update_available": "Update available {local} -> {remote}. Update now?",
+        "update_done": "Update complete. Please restart EasyAI.",
+        "update_failed": "Update failed:",
+        "update_none": "Already up to date.",
     },
 }
 
@@ -230,6 +243,7 @@ class EasyAIClient:
         self.agent = AssistantAgent(build_provider(self.config.provider), self.config, self.workspace)
         self.runner = PythonRunner(self.workspace)
         self.downloader = SoftwareDownloader(root)
+        self.updater = GitUpdater(root)
         self.pet = TerminalPet()
         self.stop_event = threading.Event()
         self.poller: Optional[threading.Thread] = None
@@ -238,6 +252,7 @@ class EasyAIClient:
 
     def run(self) -> None:
         self._choose_language()
+        self._check_update()
         self._ensure_login()
         self._start_background_client()
         self._render_header()
@@ -275,6 +290,28 @@ class EasyAIClient:
     def _t(self, key: str, **kwargs: object) -> str:
         value = TEXT[self.language][key]
         return value.format(**kwargs) if kwargs else value
+
+    def _check_update(self) -> None:
+        self.console.print(self._t("update_check"))
+        try:
+            status = self.updater.check()
+        except Exception as exc:
+            self.console.print("[yellow]%s[/] %s" % (self._t("update_unavailable"), exc))
+            return
+        if status.message:
+            self.console.print("[yellow]%s[/] %s" % (self._t("update_unavailable"), status.message))
+            return
+        if not status.available:
+            self.console.print("[green]%s[/]" % self._t("update_none"))
+            return
+        if Confirm.ask(self._t("update_available", local=status.local_revision, remote=status.remote_revision), default=True):
+            try:
+                self.updater.update()
+            except Exception as exc:
+                self.console.print("[red]%s[/] %s" % (self._t("update_failed"), exc))
+                return
+            self.console.print("[green]%s[/]" % self._t("update_done"))
+            raise SystemExit(0)
 
     def _ensure_login(self) -> None:
         if self.session.get("token"):
