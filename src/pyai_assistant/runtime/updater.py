@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import subprocess
+import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional
 
 
 @dataclass
@@ -18,7 +18,17 @@ class UpdateStatus:
 
 class GitUpdater:
     def __init__(self, root: Path) -> None:
-        self.root = root.resolve()
+        self.root = self.discover_root(root)
+
+    @staticmethod
+    def discover_root(start: Path) -> Path:
+        path = start.resolve()
+        if path.is_file():
+            path = path.parent
+        for candidate in (path, *path.parents):
+            if (candidate / ".git").exists():
+                return candidate
+        return path
 
     def is_git_install(self) -> bool:
         return (self.root / ".git").exists()
@@ -36,8 +46,10 @@ class GitUpdater:
 
     def update(self) -> str:
         self._git(["pull", "--ff-only", "origin", "main"])
+        venv_python = self.root / ".venv" / "Scripts" / "python.exe"
+        python_executable = str(venv_python) if venv_python.exists() else sys.executable
         completed = subprocess.run(
-            [str(self.root / ".venv" / "Scripts" / "python.exe"), "-m", "pip", "install", "-e", "."],
+            [python_executable, "-m", "pip", "install", "-e", "."],
             cwd=str(self.root),
             capture_output=True,
             text=True,

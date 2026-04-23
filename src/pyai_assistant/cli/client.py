@@ -262,7 +262,7 @@ class EasyAIClient:
         self.agent = AssistantAgent(build_provider(self.config.provider), self.config, self.workspace)
         self.runner = PythonRunner(self.workspace)
         self.downloader = SoftwareDownloader(root)
-        self.updater = GitUpdater(root)
+        self.updater = GitUpdater(Path(__file__))
         self.pet = TerminalPet()
         self.stop_event = threading.Event()
         self.poller: Optional[threading.Thread] = None
@@ -326,7 +326,7 @@ class EasyAIClient:
         except Exception as exc:
             self.console.print("[yellow]%s[/] %s" % (self._t("update_unavailable"), exc))
             return
-        if status.offline or status.skipped:
+        if status.offline:
             return
         if status.message:
             self.console.print("[yellow]%s[/] %s" % (self._t("update_unavailable"), status.message))
