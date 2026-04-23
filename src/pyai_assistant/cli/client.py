@@ -74,6 +74,16 @@ TEXT = {
         "no_pending": "没有待应用修改。",
         "no_run": "没有建议运行的验证命令。可用 /run demo.py 或 /run pytest tests。",
         "language_set": "语言已切换为中文。",
+        "server": "服务器",
+        "user": "用户",
+        "computer": "电脑",
+        "provider": "模型来源",
+        "model": "模型",
+        "mode": "模式",
+        "permission": "权限",
+        "help": "帮助",
+        "client_title": "EasyAI 客户端",
+        "help_title": "帮助",
     },
     "en": {
         "first_login": "First login requires server verification.",
@@ -114,6 +124,16 @@ TEXT = {
         "no_pending": "No pending changes.",
         "no_run": "No suggested run. Use /run demo.py or /run pytest tests.",
         "language_set": "Language switched to English.",
+        "server": "Server",
+        "user": "User",
+        "computer": "Computer",
+        "provider": "Provider",
+        "model": "Model",
+        "mode": "Mode",
+        "permission": "Permission",
+        "help": "Help",
+        "client_title": "EasyAI Client",
+        "help_title": "Help",
     },
 }
 
@@ -311,18 +331,27 @@ class EasyAIClient:
 
     def _render_header(self) -> None:
         summary = (
-            "Server: {server}\nUser: {user}\nComputer: {computer}\nProvider: {provider}\n"
-            "Model: {model}\nMode: {mode}\nPermission: {permission}\nHelp: /help"
+            "{server_label}: {server}\n{user_label}: {user}\n{computer_label}: {computer}\n"
+            "{provider_label}: {provider}\n{model_label}: {model}\n{mode_label}: {mode}\n"
+            "{permission_label}: {permission}\n{help_label}: /help"
         ).format(
+            server_label=self._t("server"),
             server=self.config.app_base_url,
+            user_label=self._t("user"),
             user=self.session.get("username", "-"),
+            computer_label=self._t("computer"),
             computer=self.computer.name,
+            provider_label=self._t("provider"),
             provider=self.config.provider,
+            model_label=self._t("model"),
             model=self.config.model,
+            mode_label=self._t("mode"),
             mode=self.agent.state.mode,
+            permission_label=self._t("permission"),
             permission=self.permission,
+            help_label=self._t("help"),
         )
-        panel = Panel(summary, title="EasyAI Client", border_style="blue")
+        panel = Panel(summary, title=self._t("client_title"), border_style="blue")
         self.console.print(Columns([panel, self.pet.render()], equal=False, expand=False) if self.pet.enabled else panel)
 
     def _ask_local_ai(self, prompt: str) -> None:
@@ -427,7 +456,7 @@ class EasyAIClient:
 
     def _show_help(self, topic: str = "") -> None:
         text = HELP_TOPICS.get(topic.lower().strip(), HELP_SHORT) if topic else HELP_SHORT
-        self.console.print(Panel(text.rstrip(), title="Help", border_style="cyan"))
+        self.console.print(Panel(text.rstrip(), title=self._t("help_title"), border_style="cyan"))
 
     def _handle_permission(self, args: List[str]) -> None:
         if not args:
