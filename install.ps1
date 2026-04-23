@@ -112,6 +112,10 @@ if (-not $ApiKey -and -not $NonInteractive -and $presetConfig.key_name) {
 }
 
 $configPath = Join-Path $InstallRoot "config.yaml"
+$modelConfigured = "false"
+if ($ApiKey) {
+    $modelConfigured = "true"
+}
 $configText = @"
 preset: $selectedPreset
 provider: $($presetConfig.provider)
@@ -121,6 +125,7 @@ temperature: 0.2
 max_tokens: 1200
 app_base_url: https://xingkongtech.top
 ollama_base_url: http://localhost:11434
+model_connection_configured: $modelConfigured
 "@
 $configText | Set-Content -Path $configPath -Encoding UTF8
 

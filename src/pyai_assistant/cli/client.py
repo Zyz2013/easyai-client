@@ -17,8 +17,9 @@ from rich.syntax import Syntax
 from rich.table import Table
 
 from pyai_assistant.agent.session import AssistantAgent
+from pyai_assistant.cli.model_setup import ensure_model_connection
 from pyai_assistant.cli.pet import TerminalPet
-from pyai_assistant.config import load_config
+from pyai_assistant.config import load_config, load_local_config_files, write_local_config
 from pyai_assistant.providers.factory import build_provider
 from pyai_assistant.providers.server_api import (
     ServerApiClient,
@@ -534,6 +535,7 @@ class EasyAIClient:
     def run(self) -> None:
         self._choose_language()
         self._check_update()
+        self._ensure_model_connection()
         self._ensure_login()
         self._start_background_client()
         self._render_header()
@@ -600,6 +602,11 @@ class EasyAIClient:
                 return
             self.console.print("[green]%s[/]" % self._t("update_done"))
             raise SystemExit(0)
+
+    def _ensure_model_connection(self) -> None:
+        self.config = ensure_model_connection(self.app_root, self.console, self.language)
+        self.agent.config = self.config
+        self.agent.provider = build_provider(self.config.provider)
 
     def _ensure_login(self) -> None:
         if self.session.get("token"):
@@ -767,10 +774,12 @@ class EasyAIClient:
         if command == "/provider" and len(parts) == 2:
             self.config.provider = parts[1]  # type: ignore[assignment]
             self.agent.provider = build_provider(self.config.provider)
+            self._save_model_config({"provider": self.config.provider})
             self.console.print("[green]%s[/] %s" % (self._t("provider_set"), self.config.provider))
             return False
         if command == "/model" and len(parts) >= 2:
             self.config.model = " ".join(parts[1:])
+            self._save_model_config({"model": self.config.model})
             self.console.print("[green]%s[/] %s" % (self._t("model_set"), self.config.model))
             return False
         if command == "/mode" and len(parts) == 2:
@@ -830,6 +839,12 @@ class EasyAIClient:
         self.permission = requested
         self._audit("permission", {"mode": self.permission})
         self.console.print("[green]%s[/] %s" % (self._t("permission_set"), self.permission))
+
+    def _save_model_config(self, updates: Dict[str, object]) -> None:
+        file_config, _ = load_local_config_files(self.app_root)
+        file_config.update(updates)
+        file_config["model_connection_configured"] = True
+        write_local_config(self.app_root, file_config)
 
     def _require_permission(self, required: str) -> None:
         order = {"safe": 0, "files": 1, "downloads": 2, "elevated": 3}
