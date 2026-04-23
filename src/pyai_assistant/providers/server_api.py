@@ -39,7 +39,11 @@ class ServerApiClient:
         authenticated: bool = True,
     ) -> Dict[str, Any]:
         body = json.dumps(payload).encode("utf-8") if payload is not None else None
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "Mozilla/5.0 EasyAI-Client/0.1 (+https://xingkongtech.top)",
+        }
         if authenticated:
             if not self.token:
                 raise ValueError("Missing server token.")

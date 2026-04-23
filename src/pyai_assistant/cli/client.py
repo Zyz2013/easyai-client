@@ -164,7 +164,14 @@ class EasyAIClient:
         self.console.print("First login requires server verification.")
         username = Prompt.ask("Username")
         password = Prompt.ask("Password", password=True)
-        payload = self.api.login(username, password, self.computer.name)
+        try:
+            payload = self.api.login(username, password, self.computer.name)
+        except Exception as exc:
+            self.console.print("[red]Server login failed:[/] %s" % exc)
+            self.console.print(
+                "[yellow]If the message contains Cloudflare 1010/403, lower the Cloudflare security rule for /api/* or try again after this client update.[/]"
+            )
+            raise SystemExit(1)
         self.session = {
             "token": payload["token"],
             "username": username,
