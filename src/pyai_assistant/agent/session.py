@@ -17,6 +17,10 @@ from pyai_assistant.types import (
 )
 from pyai_assistant.workspace.manager import WorkspaceManager
 
+PROJECT_INSTRUCTION_FILES = ("AGENTS.md", "CLAUDE.md", "EASYAI.md")
+PROJECT_MEMORY_FILE = ".easyai/memory.md"
+MAX_INSTRUCTION_CHARS = 24_000
+
 
 class AssistantAgent:
     def __init__(
@@ -68,9 +72,19 @@ class AssistantAgent:
             Message(role="system", content=BASE_SYSTEM_PROMPT),
             Message(role="system", content=mode_prompt(self.state.mode)),
         ]
+        instructions = self._load_project_instructions()
+        if instructions:
+            messages.append(Message(role="system", content="Project instructions and memory:\n\n%s" % instructions))
         if self.state.context_files:
             snapshot = self.workspace.snapshot_context(self.state.context_files)
             messages.append(Message(role="system", content="Current workspace file context:\n\n%s" % snapshot))
+        if self.state.metadata.get("conversation_summary"):
+            messages.append(
+                Message(
+                    role="system",
+                    content="Earlier conversation summary:\n%s" % self.state.metadata["conversation_summary"],
+                )
+            )
         if self.state.pending_result and self.state.pending_result.proposed_changes:
             messages.append(
                 Message(
@@ -81,6 +95,23 @@ class AssistantAgent:
         messages.extend(self.state.messages[-8:])
         messages.append(Message(role="user", content=user_input))
         return messages
+
+    def _load_project_instructions(self) -> str:
+        blocks = []
+        for relative_path in PROJECT_INSTRUCTION_FILES + (PROJECT_MEMORY_FILE,):
+            path = self.workspace.root / relative_path
+            if not path.exists() or not path.is_file():
+                continue
+            try:
+                text = path.read_text(encoding="utf-8").strip()
+            except UnicodeDecodeError:
+                continue
+            if text:
+                blocks.append("FILE: %s\n%s" % (relative_path, text))
+        combined = "\n\n".join(blocks)
+        if len(combined) > MAX_INSTRUCTION_CHARS:
+            return combined[:MAX_INSTRUCTION_CHARS] + "\n\n[EasyAI truncated project instructions.]"
+        return combined
 
     def _parse_response(self, raw_response: str) -> AssistantResult:
         if self.state.mode != "edit":

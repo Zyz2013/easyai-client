@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import json
 import shlex
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -158,6 +160,7 @@ Help topics
   /help download    Download/install: URL, winget search, confirmed install
   /help account     Server account, provider, model, mode, logout
   /help permission  Permission modes and switching
+  /help agent       Status, doctor, init, memory, compact, review, custom commands
   /language zh|en   Switch CLI language
 
 Common flow
@@ -228,6 +231,22 @@ Permission modes
 
 Default mode is safe. High-risk actions still ask for confirmation.
 """,
+    "agent": """\
+Agent workspace features
+  /status                        Show session, context, account, permission, and server state
+  /doctor                        Check Git, config, API key, Ollama hint, and workspace files
+  /init                          Create AGENTS.md, .easyai/memory.md, and example custom commands
+  /plan <task>                   Ask for an implementation plan without applying changes
+  /memory                        Show project memory
+  /memory add <text>             Append project memory
+  # <text>                       Quick memory append, same as /memory add
+  /compact                       Summarize old chat turns and keep recent context
+  /review [focus]                Ask for a code-review style pass over loaded context
+  /commands                      List .easyai/commands/*.md custom commands
+  /<custom> [args]               Run a custom command prompt from .easyai/commands/<custom>.md
+
+Project rule files loaded automatically: AGENTS.md, CLAUDE.md, EASYAI.md, .easyai/memory.md.
+""",
 }
 
 
@@ -249,6 +268,10 @@ class EasyAIClient:
         self.poller: Optional[threading.Thread] = None
         self.permission = "safe"
         self.language = "zh"
+        self.easyai_dir = self.root / ".easyai"
+        self.memory_path = self.easyai_dir / "memory.md"
+        self.commands_dir = self.easyai_dir / "commands"
+        self.audit_path = self.easyai_dir / "audit.log"
 
     def run(self) -> None:
         self._choose_language()
@@ -265,6 +288,9 @@ class EasyAIClient:
                 return
 
             if not user_input.strip():
+                continue
+            if user_input.lstrip().startswith("#"):
+                self._quick_memory(user_input.lstrip()[1:].strip())
                 continue
             if user_input.startswith("/"):
                 try:
@@ -440,6 +466,30 @@ class EasyAIClient:
         if command == "/permission":
             self._handle_permission(parts[1:])
             return False
+        if command == "/status":
+            self._show_status()
+            return False
+        if command == "/doctor":
+            self._show_doctor()
+            return False
+        if command == "/init":
+            self._init_workspace()
+            return False
+        if command == "/plan":
+            self._plan_task(" ".join(parts[1:]).strip())
+            return False
+        if command == "/memory":
+            self._handle_memory(parts[1:])
+            return False
+        if command == "/compact":
+            self._compact_conversation()
+            return False
+        if command == "/review":
+            self._review_context(" ".join(parts[1:]).strip())
+            return False
+        if command == "/commands":
+            self._list_custom_commands()
+            return False
         if command == "/language" and len(parts) == 2:
             requested = parts[1].lower()
             if requested not in LANGUAGES:
@@ -492,6 +542,8 @@ class EasyAIClient:
             self._require_permission("files")
             self._list_files()
             return False
+        if self._handle_custom_command(command, parts[1:]):
+            return False
         self.console.print("[yellow]%s[/]" % self._t("unknown"))
         return False
 
@@ -509,6 +561,7 @@ class EasyAIClient:
         if requested == "elevated" and not Confirm.ask(self._t("permission_confirm"), default=False):
             return
         self.permission = requested
+        self._audit("permission", {"mode": self.permission})
         self.console.print("[green]%s[/] %s" % (self._t("permission_set"), self.permission))
 
     def _require_permission(self, required: str) -> None:
@@ -549,6 +602,7 @@ class EasyAIClient:
         if self.downloader.is_url(query):
             if Confirm.ask(self._t("download_url"), default=False):
                 result = self.downloader.download_url(query)
+                self._audit("download", {"query": query, "path": str(result.path)})
                 self.console.print("[green]%s[/] %s" % (self._t("downloaded"), result.path))
             return
         if install:
@@ -559,6 +613,7 @@ class EasyAIClient:
             if elevated and not Confirm.ask(self._t("admin_confirm", query=query), default=False):
                 return
             result = self.downloader.winget_install(query, elevated=elevated)
+            self._audit("install", {"query": query, "elevated": elevated})
             self.console.print(Panel(result.message, title="Install", border_style="green"))
             return
         if Confirm.ask(self._t("search_confirm", query=query), default=True):
@@ -592,6 +647,7 @@ class EasyAIClient:
             if Confirm.ask("Apply changes to %s?" % change.path, default=False):
                 self.workspace.apply_change(change)
                 self.agent.state.applied_changes.append(change)
+                self._audit("apply", {"path": change.path})
                 self.console.print("[green]Applied[/] %s" % change.path)
         if pending.suggested_run and Confirm.ask("Run suggested validation now?", default=False):
             self._execute_run(pending.suggested_run)
@@ -622,6 +678,7 @@ class EasyAIClient:
 
     def _execute_run(self, request: RunRequest) -> None:
         result = self.runner.run(request)
+        self._audit("run", {"command": result.command, "exit_code": result.exit_code})
         summary = "Exit code: %s\nCommand: %s" % (result.exit_code, " ".join(result.command))
         self.console.print(Panel(summary, title="Run Result", border_style="magenta"))
         if result.stdout:
@@ -635,6 +692,167 @@ class EasyAIClient:
         for path in self.workspace.list_code_files():
             table.add_row(path.relative_to(self.root).as_posix())
         self.console.print(table)
+
+    def _show_status(self) -> None:
+        table = Table(title="EasyAI Status")
+        table.add_column("Item")
+        table.add_column("Value")
+        table.add_row("Server", self.config.app_base_url)
+        table.add_row("User", str(self.session.get("username", "")))
+        table.add_row("Computer", self.computer.name)
+        table.add_row("Provider", self.config.provider)
+        table.add_row("Model", self.config.model)
+        table.add_row("Mode", self.agent.state.mode)
+        table.add_row("Permission", self.permission)
+        table.add_row("Language", self.language)
+        table.add_row("Context files", str(len(self.agent.state.context_files)))
+        table.add_row("Pending changes", str(len(self.agent.state.pending_result.proposed_changes) if self.agent.state.pending_result else 0))
+        table.add_row("Project memory", "yes" if self.memory_path.exists() else "no")
+        self.console.print(table)
+
+    def _show_doctor(self) -> None:
+        table = Table(title="EasyAI Doctor")
+        table.add_column("Check")
+        table.add_column("Result")
+        table.add_row("Workspace", str(self.root))
+        table.add_row("Git install", "yes" if self.updater.is_git_install() else "no")
+        table.add_row("Config file", "yes" if (self.root / "config.yaml").exists() else "no")
+        table.add_row("Server URL", self.config.app_base_url)
+        table.add_row("API key", "set" if self.config.api_key or self.config.provider == "ollama" else "missing")
+        table.add_row("Ollama", self.config.ollama_base_url)
+        table.add_row("Files visible", str(len(self.workspace.list_code_files())))
+        table.add_row("Rule files", ", ".join(self._existing_rule_files()) or "none")
+        self.console.print(table)
+
+    def _init_workspace(self) -> None:
+        self.easyai_dir.mkdir(parents=True, exist_ok=True)
+        self.commands_dir.mkdir(parents=True, exist_ok=True)
+        agents_path = self.root / "AGENTS.md"
+        if not agents_path.exists():
+            agents_path.write_text(
+                "# Project Instructions\n\n"
+                "- Prefer small, maintainable changes.\n"
+                "- Explain tradeoffs briefly.\n"
+                "- Ask before destructive operations.\n"
+                "- Run focused validation after edits when possible.\n",
+                encoding="utf-8",
+            )
+        if not self.memory_path.exists():
+            self.memory_path.write_text("# EasyAI Memory\n\n", encoding="utf-8")
+        review_command = self.commands_dir / "review.md"
+        if not review_command.exists():
+            review_command.write_text(
+                "Review the loaded context like a senior engineer. Focus on bugs, security, regressions, and missing tests. Args: {{args}}\n",
+                encoding="utf-8",
+            )
+        self._audit("init", {"path": str(self.easyai_dir)})
+        self.console.print("[green]Initialized EasyAI workspace files.[/]")
+
+    def _plan_task(self, task: str) -> None:
+        if not task:
+            raise ValueError("Plan task is empty.")
+        prompt = (
+            "Create a concise implementation plan for this task. "
+            "Do not propose file writes yet. Include risks, validation, and required context. Task: %s" % task
+        )
+        self._ask_local_ai(prompt)
+
+    def _handle_memory(self, args: List[str]) -> None:
+        if not args:
+            text = self.memory_path.read_text(encoding="utf-8") if self.memory_path.exists() else "(empty)"
+            self.console.print(Panel(text.strip() or "(empty)", title="Project Memory", border_style="cyan"))
+            return
+        action = args[0].lower()
+        if action == "add":
+            self._append_memory(" ".join(args[1:]).strip())
+            return
+        if action == "clear":
+            if Confirm.ask("Clear project memory?", default=False):
+                self.easyai_dir.mkdir(parents=True, exist_ok=True)
+                self.memory_path.write_text("# EasyAI Memory\n\n", encoding="utf-8")
+                self._audit("memory.clear", {})
+            return
+        raise ValueError("Unsupported memory command.")
+
+    def _quick_memory(self, text: str) -> None:
+        if not text:
+            self.console.print("[yellow]Memory text is empty.[/]")
+            return
+        self._append_memory(text)
+
+    def _append_memory(self, text: str) -> None:
+        if not text:
+            raise ValueError("Memory text is empty.")
+        self.easyai_dir.mkdir(parents=True, exist_ok=True)
+        if not self.memory_path.exists():
+            self.memory_path.write_text("# EasyAI Memory\n\n", encoding="utf-8")
+        timestamp = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+        with self.memory_path.open("a", encoding="utf-8") as handle:
+            handle.write("- %s %s\n" % (timestamp, text))
+        self._audit("memory.add", {"text": text})
+        self.console.print("[green]Memory saved.[/]")
+
+    def _compact_conversation(self) -> None:
+        messages = self.agent.state.messages
+        if len(messages) <= 6:
+            self.console.print("[yellow]Not enough conversation to compact.[/]")
+            return
+        old_messages = messages[:-4]
+        summary_lines = []
+        for message in old_messages[-12:]:
+            content = message.content.replace("\n", " ").strip()
+            summary_lines.append("%s: %s" % (message.role, content[:220]))
+        previous = str(self.agent.state.metadata.get("conversation_summary", "")).strip()
+        combined = (previous + "\n" if previous else "") + "\n".join(summary_lines)
+        self.agent.state.metadata["conversation_summary"] = combined[-5000:]
+        self.agent.state.messages = messages[-4:]
+        self._audit("compact", {"remaining_messages": len(self.agent.state.messages)})
+        self.console.print("[green]Conversation compacted.[/]")
+
+    def _review_context(self, focus: str) -> None:
+        self._require_permission("files")
+        if not self.agent.state.context_files:
+            raise ValueError("Load context first with /open or /context add.")
+        prompt = (
+            "Review the loaded context. Prioritize concrete bugs, security risks, regressions, and missing tests. "
+            "Give file/line references when possible. Focus: %s" % (focus or "general")
+        )
+        self._ask_local_ai(prompt)
+
+    def _list_custom_commands(self) -> None:
+        table = Table(title="Custom Commands")
+        table.add_column("Command")
+        table.add_column("File")
+        for path in sorted(self.commands_dir.glob("*.md")) if self.commands_dir.exists() else []:
+            table.add_row("/" + path.stem, path.relative_to(self.root).as_posix())
+        if not table.rows:
+            table.add_row("(none)", ".easyai/commands/*.md")
+        self.console.print(table)
+
+    def _handle_custom_command(self, command: str, args: List[str]) -> bool:
+        name = command.lstrip("/")
+        if not name or name in {"help", "quit", "exit"}:
+            return False
+        path = self.commands_dir / ("%s.md" % name)
+        if not path.exists():
+            return False
+        prompt = path.read_text(encoding="utf-8")
+        prompt = prompt.replace("{{args}}", " ".join(args))
+        self._ask_local_ai(prompt)
+        return True
+
+    def _existing_rule_files(self) -> List[str]:
+        return [name for name in ("AGENTS.md", "CLAUDE.md", "EASYAI.md", ".easyai/memory.md") if (self.root / name).exists()]
+
+    def _audit(self, action: str, payload: dict) -> None:
+        self.easyai_dir.mkdir(parents=True, exist_ok=True)
+        event = {
+            "time": datetime.utcnow().isoformat(timespec="seconds") + "Z",
+            "action": action,
+            "payload": payload,
+        }
+        with self.audit_path.open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(event, ensure_ascii=False) + "\n")
 
 
 def main() -> None:

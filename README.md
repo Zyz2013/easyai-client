@@ -13,6 +13,9 @@ It includes the original local EasyAI features:
 - web task polling from the central server
 - explicit permission modes through `/permission`
 - update checking on every startup when installed from Git
+- project memory and rule files like `AGENTS.md`, `CLAUDE.md`, `EASYAI.md`
+- custom command prompts in `.easyai/commands/*.md`
+- status, doctor, planning, compact, and review workflows
 
 Users run:
 
@@ -132,3 +135,38 @@ EasyAI starts in safe mode.
 - `elevated`: allow admin install prompts after extra confirmation
 
 High-risk actions still ask for confirmation even after switching modes.
+
+## Agent Workflows
+
+EasyAI now includes several Codex/Claude-Code style workflows:
+
+```text
+/status
+/doctor
+/init
+/plan <task>
+/memory
+/memory add <text>
+# <text>
+/compact
+/review [focus]
+/commands
+/<custom> [args]
+```
+
+- `/init` creates `AGENTS.md`, `.easyai/memory.md`, and `.easyai/commands/review.md`.
+- `AGENTS.md`, `CLAUDE.md`, `EASYAI.md`, and `.easyai/memory.md` are loaded into the assistant automatically.
+- `.easyai/commands/<name>.md` becomes `/<name>`, and `{{args}}` is replaced with command arguments.
+- Important local actions are logged to `.easyai/audit.log`.
+
+## Comparison
+
+| Area | Claude Code / Codex style | EasyAI status |
+| --- | --- | --- |
+| Project rules | `CLAUDE.md` / `AGENTS.md` style instructions | Supports `AGENTS.md`, `CLAUDE.md`, `EASYAI.md` |
+| Memory | Persisted project notes | Supports `.easyai/memory.md` and `# <text>` quick memory |
+| Safety | Sandbox/approval modes | Supports `/permission safe/files/downloads/elevated` plus confirmations |
+| Planning | Plan before edits | Supports `/plan <task>` |
+| Review | Code review mode | Supports `/review [focus]` over loaded context |
+| Custom commands | Reusable slash commands | Supports `.easyai/commands/*.md` |
+| Context compaction | Keep long sessions usable | Supports `/compact` |
