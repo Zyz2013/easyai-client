@@ -8,6 +8,7 @@ param(
 $ErrorActionPreference = "Stop"
 
 $InstallRoot = (Resolve-Path $PSScriptRoot).Path
+$LauncherDir = if ($env:EASYAI_LAUNCHER_DIR) { $env:EASYAI_LAUNCHER_DIR } else { (Get-Location).Path }
 $UserBin = Join-Path $env:LOCALAPPDATA "EasyAI\bin"
 $VenvPython = Join-Path $InstallRoot ".venv\Scripts\python.exe"
 $VenvPip = Join-Path $InstallRoot ".venv\Scripts\pip.exe"
@@ -148,6 +149,8 @@ setlocal
 $launcher | Set-Content -Path (Join-Path $UserBin "easyai.cmd") -Encoding ASCII
 $launcher | Set-Content -Path (Join-Path $UserBin "Easyai.cmd") -Encoding ASCII
 $launcher | Set-Content -Path (Join-Path $InstallRoot "Easyai.cmd") -Encoding ASCII
+$launcher | Set-Content -Path (Join-Path $LauncherDir "easyai.cmd") -Encoding ASCII
+$launcher | Set-Content -Path (Join-Path $LauncherDir "Easyai.cmd") -Encoding ASCII
 
 Ensure-UserPath -PathToAdd $UserBin
 
@@ -167,7 +170,8 @@ finally {
 Write-Section "EasyAI client installed."
 Write-Host "Install root: $InstallRoot" -ForegroundColor Green
 Write-Host "Global commands: easyai  or  Easyai" -ForegroundColor Green
+Write-Host "Current directory launchers: $(Join-Path $LauncherDir 'easyai.cmd') and $(Join-Path $LauncherDir 'Easyai.cmd')" -ForegroundColor Green
 Write-Host "Self-test: passed" -ForegroundColor Green
 Write-Host "You can run EasyAI from any directory. File operations use the directory where you start it." -ForegroundColor Yellow
 Write-Host ""
-Write-Host "If this PowerShell window cannot find easyai immediately, open a new PowerShell window." -ForegroundColor Cyan
+Write-Host "If an old terminal cannot find easyai from another directory immediately, open a new terminal so Windows reloads PATH." -ForegroundColor Cyan

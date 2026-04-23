@@ -33,7 +33,7 @@ One-line install:
 git clone https://github.com/Zyz2013/easyai-client.git EasyAI && EasyAI\install.cmd
 ```
 
-The installer creates a virtual environment, installs EasyAI, writes `config.yaml` and `.env`, creates global `easyai` and `Easyai` commands, adds them to the user PATH, and runs a local self-test from a different directory.
+The installer creates a virtual environment, installs EasyAI, writes `config.yaml` and `.env`, creates global `easyai` and `Easyai` commands, adds them to the user PATH, creates launchers in the current directory, and runs a local self-test from a different directory.
 
 Non-interactive install:
 
@@ -85,7 +85,7 @@ Log in with the website account. Keep this window open when you want the website
 
 Use `/help` inside EasyAI to see all local commands.
 
-You can run `easyai` or `Easyai` from any directory. EasyAI keeps account/config/update data in the install folder, while file operations, downloads, memory, and project commands use the directory where you start EasyAI.
+After install, run `easyai` or `Easyai` to open the login screen. In a new terminal it works from any directory. In the same terminal immediately after install, it works from the directory where you ran the install command because the installer creates local launchers there. EasyAI keeps account/config/update data in the install folder, while file operations, downloads, memory, and project commands use the directory where you start EasyAI.
 
 At first startup, choose `zh` or `en`. The choice is saved locally, so later startups do not ask again. Change it later with:
 
