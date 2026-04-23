@@ -2,6 +2,16 @@
 
 This is the user-side app only. It is not a server.
 
+It includes the original local EasyAI features:
+
+- local chat with the user's own API key or Ollama
+- file context
+- edit proposals with preview/apply
+- validation commands
+- software download/install with confirmation
+- terminal pet
+- web task polling from the central server
+
 Users run:
 
 ```powershell
@@ -42,7 +52,15 @@ The server is:
 https://xingkongtech.top
 ```
 
-Each user computer uses its own API key or local Ollama model. Account data, chat history, computer status, and task results are stored on the server.
+Each user computer uses its own API key or local Ollama model. Account data, web chat history, computer status, and web task results are stored on the server.
+
+The client only keeps local data required to operate this computer:
+
+- `config.yaml`
+- `.env`
+- `easyai-data/client_session.json`
+- `easyai-data/computer_id`
+- files you explicitly download or edit
 
 ## Run
 
@@ -57,3 +75,5 @@ or:
 ```
 
 Log in with the website account. Keep this window open when you want the website to operate this computer.
+
+Use `/help` inside EasyAI to see all local commands.
