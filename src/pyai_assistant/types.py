@@ -34,7 +34,7 @@ class AppConfig:
     ollama_base_url: str = "http://localhost:11434"
     secret_key: str = "change-me"
     database_url: str = "easyai-data/easyai.json"
-    app_base_url: str = "http://127.0.0.1:8000"
+    app_base_url: str = "https://xingkongtech.top"
     host: str = "127.0.0.1"
     port: int = 8000
     session_cookie_secure: bool = True
