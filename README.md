@@ -27,16 +27,18 @@ On Windows, `Easyai` also works because command lookup is case-insensitive.
 
 ## Install
 
-One-line install after this folder is published to a Git repository:
+One-line install:
 
 ```powershell
-git clone <YOUR_EASYAI_CLIENT_GIT_URL> EasyAI && cd EasyAI && powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+git clone https://github.com/Zyz2013/easyai-client.git EasyAI && cd EasyAI && powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
 ```
 
-If the repository is published as `https://github.com/<owner>/easyai-client.git`, users install with:
+The installer creates a virtual environment, installs EasyAI, writes `config.yaml` and `.env`, creates global `easyai` and `Easyai` commands, and adds them to the user PATH.
+
+Non-interactive install:
 
 ```powershell
-git clone https://github.com/<owner>/easyai-client.git EasyAI && cd EasyAI && powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+git clone https://github.com/Zyz2013/easyai-client.git EasyAI && cd EasyAI && powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -NonInteractive
 ```
 
 Local install:
@@ -49,7 +51,7 @@ pip install -e .
 
 ## Configure
 
-Edit `config.yaml` and `.env`, or keep the defaults and fill your own API key.
+The installer writes `config.yaml` and `.env` automatically. You can also edit them later in the install folder.
 
 The server is:
 
@@ -82,6 +84,8 @@ or:
 Log in with the website account. Keep this window open when you want the website to operate this computer.
 
 Use `/help` inside EasyAI to see all local commands.
+
+You can run `easyai` or `Easyai` from any directory. EasyAI keeps account/config/update data in the install folder, while file operations, downloads, memory, and project commands use the directory where you start EasyAI.
 
 At first startup, choose `zh` or `en`. The choice is saved locally, so later startups do not ask again. Change it later with:
 

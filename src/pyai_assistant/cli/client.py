@@ -252,17 +252,18 @@ Project rule files loaded automatically: AGENTS.md, CLAUDE.md, EASYAI.md, .easya
 
 class EasyAIClient:
     def __init__(self, root: Path) -> None:
-        self.root = root
+        self.root = root.resolve()
+        self.app_root = GitUpdater.discover_root(Path(__file__))
         self.console = Console()
-        self.config = load_config(root)
-        self.computer = load_computer_identity(root)
-        self.session = load_client_session(root)
+        self.config = load_config(self.app_root)
+        self.computer = load_computer_identity(self.app_root)
+        self.session = load_client_session(self.app_root)
         self.api = ServerApiClient(self.config.app_base_url, self.session.get("token"))
-        self.workspace = WorkspaceManager(root)
+        self.workspace = WorkspaceManager(self.root)
         self.agent = AssistantAgent(build_provider(self.config.provider), self.config, self.workspace)
         self.runner = PythonRunner(self.workspace)
-        self.downloader = SoftwareDownloader(root)
-        self.updater = GitUpdater(Path(__file__))
+        self.downloader = SoftwareDownloader(self.root)
+        self.updater = GitUpdater(self.app_root)
         self.pet = TerminalPet()
         self.stop_event = threading.Event()
         self.poller: Optional[threading.Thread] = None
@@ -313,7 +314,7 @@ class EasyAIClient:
         choice = Prompt.ask("Language / 语言", choices=["zh", "en"], default="zh")
         self.language = choice
         self.session["language"] = choice
-        save_client_session(self.root, self.session)
+        save_client_session(self.app_root, self.session)
 
     def _t(self, key: str, **kwargs: object) -> str:
         value = TEXT[self.language][key]
@@ -364,7 +365,7 @@ class EasyAIClient:
             "server": self.config.app_base_url,
             "language": self.language,
         }
-        save_client_session(self.root, self.session)
+        save_client_session(self.app_root, self.session)
         self.api.token = payload["token"]
         self.console.print("[green]%s[/]" % self._t("login_saved"))
 
@@ -456,6 +457,7 @@ class EasyAIClient:
         if command in {"/quit", "/exit", "/logout"}:
             if command == "/logout":
                 clear_client_session(self.root)
+                clear_client_session(self.app_root)
                 self.console.print(self._t("logout_cleared"))
             else:
                 self.console.print(self._t("stopped"))
@@ -496,7 +498,7 @@ class EasyAIClient:
                 raise ValueError("Unsupported language: %s" % requested)
             self.language = requested
             self.session["language"] = requested
-            save_client_session(self.root, self.session)
+            save_client_session(self.app_root, self.session)
             self.console.print("[green]%s[/]" % self._t("language_set"))
             return False
         if command == "/download":
@@ -697,6 +699,8 @@ class EasyAIClient:
         table = Table(title="EasyAI Status")
         table.add_column("Item")
         table.add_column("Value")
+        table.add_row("Install root", str(self.app_root))
+        table.add_row("Workspace", str(self.root))
         table.add_row("Server", self.config.app_base_url)
         table.add_row("User", str(self.session.get("username", "")))
         table.add_row("Computer", self.computer.name)
