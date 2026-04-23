@@ -326,7 +326,7 @@ class EasyAIClient:
         except Exception as exc:
             self.console.print("[yellow]%s[/] %s" % (self._t("update_unavailable"), exc))
             return
-        if status.offline:
+        if status.offline or status.skipped:
             return
         if status.message:
             self.console.print("[yellow]%s[/] %s" % (self._t("update_unavailable"), status.message))

@@ -13,6 +13,7 @@ class UpdateStatus:
     remote_revision: str
     message: str = ""
     offline: bool = False
+    skipped: bool = False
 
 
 class GitUpdater:
@@ -24,7 +25,7 @@ class GitUpdater:
 
     def check(self) -> UpdateStatus:
         if not self.is_git_install():
-            return UpdateStatus(False, "", "", "Not a Git install; automatic update is unavailable.")
+            return UpdateStatus(False, "", "", "Not a Git install; automatic update is unavailable.", skipped=True)
         local = self._git(["rev-parse", "HEAD"])
         try:
             self._git(["fetch", "--quiet", "origin", "main"])
