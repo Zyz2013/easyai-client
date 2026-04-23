@@ -25,6 +25,8 @@ from pyai_assistant.types import AssistantResult, RunRequest
 from pyai_assistant.workspace.manager import WorkspaceManager
 
 
+PERMISSION_LEVELS = {"safe", "files", "downloads", "elevated"}
+
 HELP_SHORT = """\
 Help topics
   /help files       Files/context: list, open, add/remove context, reset
@@ -32,6 +34,7 @@ Help topics
   /help pet         Pet: status, on, off
   /help download    Download/install: URL, winget search, confirmed install
   /help account     Server account, provider, model, mode, logout
+  /help permission  Permission modes and switching
 
 Common flow
   /open <file>
@@ -78,12 +81,27 @@ Default only downloads into workspace downloads/ or searches winget. Install and
 """,
     "account": """\
 Account/model
+  /permission                    Show current permission mode
+  /permission safe               Safe mode: chat + server sync only
+  /permission files              Allow file context/edit after confirmation
+  /permission downloads          Allow files + downloads/install after confirmation
+  /permission elevated           Allow downloads + admin actions after extra confirmation
   /provider openai_compatible
   /provider ollama
   /model <name>
   /mode chat|code|edit
   /logout
   /quit
+""",
+    "permission": """\
+Permission modes
+  /permission                    Show current mode
+  /permission safe               Chat and server sync only
+  /permission files              Allow file read/edit/apply and validation
+  /permission downloads          Allow files plus download/install flows
+  /permission elevated           Allow admin install prompts after extra confirmation
+
+Default mode is safe. High-risk actions still ask for confirmation.
 """,
 }
 
@@ -103,6 +121,7 @@ class EasyAIClient:
         self.pet = TerminalPet()
         self.stop_event = threading.Event()
         self.poller: Optional[threading.Thread] = None
+        self.permission = "safe"
 
     def run(self) -> None:
         self._ensure_login()
@@ -174,7 +193,7 @@ class EasyAIClient:
     def _render_header(self) -> None:
         summary = (
             "Server: {server}\nUser: {user}\nComputer: {computer}\nProvider: {provider}\n"
-            "Model: {model}\nMode: {mode}\nHelp: /help"
+            "Model: {model}\nMode: {mode}\nPermission: {permission}\nHelp: /help"
         ).format(
             server=self.config.app_base_url,
             user=self.session.get("username", "-"),
@@ -182,6 +201,7 @@ class EasyAIClient:
             provider=self.config.provider,
             model=self.config.model,
             mode=self.agent.state.mode,
+            permission=self.permission,
         )
         panel = Panel(summary, title="EasyAI Client", border_style="blue")
         self.console.print(Columns([panel, self.pet.render()], equal=False, expand=False) if self.pet.enabled else panel)
@@ -224,6 +244,9 @@ class EasyAIClient:
         if command == "/help":
             self._show_help(parts[1] if len(parts) > 1 else "")
             return False
+        if command == "/permission":
+            self._handle_permission(parts[1:])
+            return False
         if command == "/download":
             self._handle_download_parts(parts[1:])
             return False
@@ -244,15 +267,19 @@ class EasyAIClient:
             self.console.print("[green]Mode set to[/] %s" % self.agent.state.mode)
             return False
         if command == "/open" and len(parts) == 2:
+            self._require_permission("files")
             self._open_file(parts[1])
             return False
         if command == "/context" and len(parts) >= 3:
+            self._require_permission("files")
             self._handle_context(parts[1], parts[2])
             return False
         if command == "/apply":
+            self._require_permission("files")
             self._apply_pending()
             return False
         if command == "/run":
+            self._require_permission("files")
             self._run_command(parts[1:])
             return False
         if command == "/reset":
@@ -260,6 +287,7 @@ class EasyAIClient:
             self.console.print("[green]Session reset.[/]")
             return False
         if command == "/files":
+            self._require_permission("files")
             self._list_files()
             return False
         self.console.print("[yellow]Unknown command. Type /help.[/]")
@@ -268,6 +296,23 @@ class EasyAIClient:
     def _show_help(self, topic: str = "") -> None:
         text = HELP_TOPICS.get(topic.lower().strip(), HELP_SHORT) if topic else HELP_SHORT
         self.console.print(Panel(text.rstrip(), title="Help", border_style="cyan"))
+
+    def _handle_permission(self, args: List[str]) -> None:
+        if not args:
+            self.console.print(Panel("Current permission: %s" % self.permission, title="Permission", border_style="cyan"))
+            return
+        requested = args[0].lower()
+        if requested not in PERMISSION_LEVELS:
+            raise ValueError("Unsupported permission mode: %s" % requested)
+        if requested == "elevated" and not Confirm.ask("Enable elevated mode? Admin actions will still ask again.", default=False):
+            return
+        self.permission = requested
+        self.console.print("[green]Permission set to[/] %s" % self.permission)
+
+    def _require_permission(self, required: str) -> None:
+        order = {"safe": 0, "files": 1, "downloads": 2, "elevated": 3}
+        if order[self.permission] < order[required]:
+            raise PermissionError("Current permission is %s. Run /permission %s first." % (self.permission, required))
 
     def _handle_pet(self, args: List[str]) -> None:
         if not args or args[0] == "status":
@@ -285,10 +330,12 @@ class EasyAIClient:
         raise ValueError("Unsupported pet command: %s" % args[0])
 
     def _handle_download_text(self, text: str) -> None:
+        self._require_permission("downloads")
         request = parse_download_request(text)
         self._perform_download(request.query, request.install, request.elevated)
 
     def _handle_download_parts(self, args: List[str]) -> None:
+        self._require_permission("downloads")
         install = "--install" in args
         elevated = "--admin" in args or "--elevated" in args
         query = " ".join(item for item in args if item not in {"--install", "--admin", "--elevated"}).strip()
@@ -303,6 +350,8 @@ class EasyAIClient:
                 self.console.print("[green]Downloaded:[/] %s" % result.path)
             return
         if install:
+            if elevated:
+                self._require_permission("elevated")
             if not Confirm.ask("Install %s with winget?" % query, default=False):
                 return
             if elevated and not Confirm.ask("Use administrator permission for %s?" % query, default=False):

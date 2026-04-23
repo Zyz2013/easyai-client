@@ -11,6 +11,7 @@ It includes the original local EasyAI features:
 - software download/install with confirmation
 - terminal pet
 - web task polling from the central server
+- explicit permission modes through `/permission`
 
 Users run:
 
@@ -77,3 +78,22 @@ or:
 Log in with the website account. Keep this window open when you want the website to operate this computer.
 
 Use `/help` inside EasyAI to see all local commands.
+
+## Permission Modes
+
+EasyAI starts in safe mode.
+
+```text
+/permission
+/permission safe
+/permission files
+/permission downloads
+/permission elevated
+```
+
+- `safe`: chat and server sync only
+- `files`: allow file context, edit preview/apply, and validation commands
+- `downloads`: allow files plus download/install flows
+- `elevated`: allow admin install prompts after extra confirmation
+
+High-risk actions still ask for confirmation even after switching modes.
