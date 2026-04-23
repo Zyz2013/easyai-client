@@ -94,6 +94,134 @@ TEXT = {
         "update_done": "更新完成。请重新打开 EasyAI。",
         "update_failed": "更新失败:",
         "update_none": "已是最新版本。",
+        "help_short": """\
+帮助主题
+  /help files       文件/上下文：列文件、打开文件、添加/移除上下文、重置
+  /help run         验证执行：Python、pytest、Node、npm/pnpm/yarn/bun test
+  /help pet         宠物：状态、开启、关闭
+  /help download    下载/安装：URL、winget 搜索、确认后安装
+  /help account     账号、模型来源、模型、模式、退出登录
+  /help permission  权限模式与切换
+  /help agent       状态、诊断、初始化、记忆、压缩、审查、自定义命令
+  /language zh|en   切换语言
+
+常用流程
+  /permission files
+  /open <文件>
+  /mode edit
+  /apply
+""",
+        "help_files": """\
+文件和上下文
+  /files                         列出可读取的代码/文本文件
+  /open <file>                   打开文件并加入上下文
+  /context add <file>            添加上下文文件
+  /context remove <file>         移除上下文文件
+  /reset                         清空会话、上下文和待应用修改
+""",
+        "help_run": """\
+验证命令
+  /run demo.py
+  /run python demo.py arg
+  /run pytest tests
+  /run node index.js
+  /run npm test
+
+安全限制：不执行任意 shell。包管理器默认阻止 install/add/remove/publish/exec 等高风险动作。
+""",
+        "help_pet": """\
+宠物
+  /pet
+  /pet status
+  /pet on
+  /pet off
+""",
+        "help_download": """\
+下载/安装
+  下载 Chrome
+  安装 VS Code
+  /download chrome
+  /download https://example.com/file.exe
+  /download chrome --install
+  /download chrome --install --admin
+
+默认只下载到当前工作区 downloads/ 或搜索 winget。安装和管理员权限都会再次确认。
+""",
+        "help_account": """\
+账号/模型
+  /language zh|en                切换语言
+  /permission                    查看当前权限
+  /permission safe               安全模式：只允许聊天和服务端同步
+  /permission files              允许文件上下文、编辑和验证
+  /permission downloads          允许文件能力加下载/安装流程
+  /permission elevated           允许管理员安装提示，仍需额外确认
+  /provider openai_compatible
+  /provider ollama
+  /model <name>
+  /mode chat|code|edit
+  /logout
+  /quit
+""",
+        "help_permission": """\
+权限模式
+  /permission                    查看当前模式
+  /permission safe               只允许聊天和服务端同步
+  /permission files              允许文件读取/编辑/应用和验证
+  /permission downloads          允许文件能力加下载/安装
+  /permission elevated           允许管理员安装提示，仍需额外确认
+
+默认是 safe。高风险操作即使切换权限后仍会再次确认。
+""",
+        "help_agent": """\
+Agent 工作区能力
+  /status                        查看会话、上下文、账号、权限、服务端状态
+  /doctor                        检查 Git、配置、API Key、Ollama、工作区文件
+  /init                          创建 AGENTS.md、.easyai/memory.md、自定义命令示例
+  /plan <task>                   只生成实施计划，不直接改文件
+  /memory                        查看项目记忆
+  /memory add <text>             追加项目记忆
+  # <text>                       快速追加记忆
+  /compact                       压缩旧会话，保留最近上下文
+  /review [focus]                对已加载上下文做代码审查
+  /commands                      列出 .easyai/commands/*.md 自定义命令
+  /<custom> [args]               执行 .easyai/commands/<custom>.md
+
+自动读取项目规则文件：AGENTS.md、CLAUDE.md、EASYAI.md、.easyai/memory.md。
+""",
+        "permission_title": "权限",
+        "loaded_context": "已加载上下文",
+        "added_context": "已添加上下文:",
+        "removed_context": "已移除上下文:",
+        "apply_confirm": "是否应用修改到 {path}？",
+        "run_suggested_now": "现在运行建议的验证命令？",
+        "run_suggested": "运行建议的验证命令？",
+        "workspace_files": "工作区文件",
+        "status_title": "EasyAI 状态",
+        "doctor_title": "EasyAI 诊断",
+        "install_root": "安装目录",
+        "workspace": "工作区",
+        "language": "语言",
+        "context_files": "上下文文件",
+        "pending_changes": "待应用修改",
+        "project_memory": "项目记忆",
+        "yes": "是",
+        "no": "否",
+        "config_file": "配置文件",
+        "api_key": "API Key",
+        "ollama": "Ollama",
+        "files_visible": "可见文件",
+        "rule_files": "规则文件",
+        "initialized": "EasyAI 工作区文件已初始化。",
+        "plan_empty": "计划任务为空。",
+        "memory_empty": "记忆内容为空。",
+        "clear_memory": "清空项目记忆？",
+        "memory_saved": "记忆已保存。",
+        "not_enough_compact": "会话太短，不需要压缩。",
+        "conversation_compacted": "会话已压缩。",
+        "load_context_first": "请先用 /open 或 /context add 加载上下文。",
+        "custom_commands": "自定义命令",
+        "file": "文件",
+        "none": "无",
     },
     "en": {
         "first_login": "First login requires server verification.",
@@ -150,6 +278,134 @@ TEXT = {
         "update_done": "Update complete. Please restart EasyAI.",
         "update_failed": "Update failed:",
         "update_none": "Already up to date.",
+        "help_short": """\
+Help topics
+  /help files       Files/context: list, open, add/remove context, reset
+  /help run         Validation: Python, pytest, Node, npm/pnpm/yarn/bun test
+  /help pet         Pet: status, on, off
+  /help download    Download/install: URL, winget search, confirmed install
+  /help account     Server account, provider, model, mode, logout
+  /help permission  Permission modes and switching
+  /help agent       Status, doctor, init, memory, compact, review, custom commands
+  /language zh|en   Switch CLI language
+
+Common flow
+  /permission files
+  /open <file>
+  /mode edit
+  /apply
+""",
+        "help_files": """\
+Files and context
+  /files                         List readable code/text files
+  /open <file>                   Open and add file context
+  /context add <file>            Add context file
+  /context remove <file>         Remove context file
+  /reset                         Clear session, context, pending changes
+""",
+        "help_run": """\
+Validation commands
+  /run demo.py
+  /run python demo.py arg
+  /run pytest tests
+  /run node index.js
+  /run npm test
+
+Safety: no arbitrary shell. Package managers block risky install/add/remove/publish/exec by default.
+""",
+        "help_pet": """\
+Pet
+  /pet
+  /pet status
+  /pet on
+  /pet off
+""",
+        "help_download": """\
+Download/install
+  download Chrome
+  install VS Code
+  /download chrome
+  /download https://example.com/file.exe
+  /download chrome --install
+  /download chrome --install --admin
+
+Default only downloads into workspace downloads/ or searches winget. Install and admin require confirmation.
+""",
+        "help_account": """\
+Account/model
+  /language zh|en                Switch CLI language
+  /permission                    Show current permission mode
+  /permission safe               Safe mode: chat + server sync only
+  /permission files              Allow file context/edit after confirmation
+  /permission downloads          Allow files + downloads/install after confirmation
+  /permission elevated           Allow downloads + admin actions after extra confirmation
+  /provider openai_compatible
+  /provider ollama
+  /model <name>
+  /mode chat|code|edit
+  /logout
+  /quit
+""",
+        "help_permission": """\
+Permission modes
+  /permission                    Show current mode
+  /permission safe               Chat and server sync only
+  /permission files              Allow file read/edit/apply and validation
+  /permission downloads          Allow files plus download/install flows
+  /permission elevated           Allow admin install prompts after extra confirmation
+
+Default mode is safe. High-risk actions still ask for confirmation.
+""",
+        "help_agent": """\
+Agent workspace features
+  /status                        Show session, context, account, permission, and server state
+  /doctor                        Check Git, config, API key, Ollama hint, and workspace files
+  /init                          Create AGENTS.md, .easyai/memory.md, and example custom commands
+  /plan <task>                   Ask for an implementation plan without applying changes
+  /memory                        Show project memory
+  /memory add <text>             Append project memory
+  # <text>                       Quick memory append, same as /memory add
+  /compact                       Summarize old chat turns and keep recent context
+  /review [focus]                Ask for a code-review style pass over loaded context
+  /commands                      List .easyai/commands/*.md custom commands
+  /<custom> [args]               Run a custom command prompt from .easyai/commands/<custom>.md
+
+Project rule files loaded automatically: AGENTS.md, CLAUDE.md, EASYAI.md, .easyai/memory.md.
+""",
+        "permission_title": "Permission",
+        "loaded_context": "Loaded Context",
+        "added_context": "Added context:",
+        "removed_context": "Removed context:",
+        "apply_confirm": "Apply changes to {path}?",
+        "run_suggested_now": "Run suggested validation now?",
+        "run_suggested": "Run suggested validation command?",
+        "workspace_files": "Workspace Files",
+        "status_title": "EasyAI Status",
+        "doctor_title": "EasyAI Doctor",
+        "install_root": "Install root",
+        "workspace": "Workspace",
+        "language": "Language",
+        "context_files": "Context files",
+        "pending_changes": "Pending changes",
+        "project_memory": "Project memory",
+        "yes": "yes",
+        "no": "no",
+        "config_file": "Config file",
+        "api_key": "API key",
+        "ollama": "Ollama",
+        "files_visible": "Files visible",
+        "rule_files": "Rule files",
+        "initialized": "Initialized EasyAI workspace files.",
+        "plan_empty": "Plan task is empty.",
+        "memory_empty": "Memory text is empty.",
+        "clear_memory": "Clear project memory?",
+        "memory_saved": "Memory saved.",
+        "not_enough_compact": "Not enough conversation to compact.",
+        "conversation_compacted": "Conversation compacted.",
+        "load_context_first": "Load context first with /open or /context add.",
+        "custom_commands": "Custom Commands",
+        "file": "File",
+        "none": "none",
     },
 }
 
@@ -551,12 +807,20 @@ class EasyAIClient:
         return False
 
     def _show_help(self, topic: str = "") -> None:
-        text = HELP_TOPICS.get(topic.lower().strip(), HELP_SHORT) if topic else HELP_SHORT
+        topic_key = topic.lower().strip()
+        help_key = "help_%s" % topic_key if topic_key else "help_short"
+        text = self._t(help_key) if help_key in TEXT[self.language] else self._t("help_short")
         self.console.print(Panel(text.rstrip(), title=self._t("help_title"), border_style="cyan"))
 
     def _handle_permission(self, args: List[str]) -> None:
         if not args:
-            self.console.print(Panel("%s %s" % (self._t("permission_current"), self.permission), title="Permission", border_style="cyan"))
+            self.console.print(
+                Panel(
+                    "%s %s" % (self._t("permission_current"), self.permission),
+                    title=self._t("permission_title"),
+                    border_style="cyan",
+                )
+            )
             return
         requested = args[0].lower()
         if requested not in PERMISSION_LEVELS:
@@ -626,17 +890,17 @@ class EasyAIClient:
     def _open_file(self, raw_path: str) -> None:
         path = self.agent.add_context_file(raw_path)
         content = path.read_text(encoding="utf-8")
-        self.console.print(Panel(str(path.relative_to(self.root)), title="Loaded Context", border_style="cyan"))
+        self.console.print(Panel(str(path.relative_to(self.root)), title=self._t("loaded_context"), border_style="cyan"))
         self.console.print(Syntax(content, self.workspace.language_hint(path), theme="ansi_dark", line_numbers=True))
 
     def _handle_context(self, action: str, raw_path: str) -> None:
         if action == "add":
             path = self.agent.add_context_file(raw_path)
-            self.console.print("[green]Added context:[/] %s" % path.relative_to(self.root))
+            self.console.print("[green]%s[/] %s" % (self._t("added_context"), path.relative_to(self.root)))
             return
         if action == "remove":
             self.agent.remove_context_file(raw_path)
-            self.console.print("[green]Removed context:[/] %s" % raw_path)
+            self.console.print("[green]%s[/] %s" % (self._t("removed_context"), raw_path))
             return
         raise ValueError("Unsupported context action: %s" % action)
 
@@ -647,12 +911,12 @@ class EasyAIClient:
             return
         for change in pending.proposed_changes:
             self.console.print(Syntax(change.diff_text, "diff", theme="ansi_dark"))
-            if Confirm.ask("Apply changes to %s?" % change.path, default=False):
+            if Confirm.ask(self._t("apply_confirm", path=change.path), default=False):
                 self.workspace.apply_change(change)
                 self.agent.state.applied_changes.append(change)
                 self._audit("apply", {"path": change.path})
                 self.console.print("[green]Applied[/] %s" % change.path)
-        if pending.suggested_run and Confirm.ask("Run suggested validation now?", default=False):
+        if pending.suggested_run and Confirm.ask(self._t("run_suggested_now"), default=False):
             self._execute_run(pending.suggested_run)
 
     def _run_command(self, args: List[str]) -> None:
@@ -660,7 +924,7 @@ class EasyAIClient:
             self._execute_run(self._parse_run_args(args))
             return
         pending = self.agent.state.pending_result
-        if pending and pending.suggested_run and Confirm.ask("Run suggested validation command?", default=False):
+        if pending and pending.suggested_run and Confirm.ask(self._t("run_suggested"), default=False):
             self._execute_run(pending.suggested_run)
             return
         self.console.print("[yellow]%s[/]" % self._t("no_run"))
@@ -690,43 +954,46 @@ class EasyAIClient:
             self.console.print(Panel(result.stderr, title="stderr", border_style="red"))
 
     def _list_files(self) -> None:
-        table = Table(title="Workspace Files")
+        table = Table(title=self._t("workspace_files"))
         table.add_column("Path")
         for path in self.workspace.list_code_files():
             table.add_row(path.relative_to(self.root).as_posix())
         self.console.print(table)
 
     def _show_status(self) -> None:
-        table = Table(title="EasyAI Status")
+        table = Table(title=self._t("status_title"))
         table.add_column("Item")
         table.add_column("Value")
-        table.add_row("Install root", str(self.app_root))
-        table.add_row("Workspace", str(self.root))
-        table.add_row("Server", self.config.app_base_url)
-        table.add_row("User", str(self.session.get("username", "")))
-        table.add_row("Computer", self.computer.name)
-        table.add_row("Provider", self.config.provider)
-        table.add_row("Model", self.config.model)
-        table.add_row("Mode", self.agent.state.mode)
-        table.add_row("Permission", self.permission)
-        table.add_row("Language", self.language)
-        table.add_row("Context files", str(len(self.agent.state.context_files)))
-        table.add_row("Pending changes", str(len(self.agent.state.pending_result.proposed_changes) if self.agent.state.pending_result else 0))
-        table.add_row("Project memory", "yes" if self.memory_path.exists() else "no")
+        table.add_row(self._t("install_root"), str(self.app_root))
+        table.add_row(self._t("workspace"), str(self.root))
+        table.add_row(self._t("server"), self.config.app_base_url)
+        table.add_row(self._t("user"), str(self.session.get("username", "")))
+        table.add_row(self._t("computer"), self.computer.name)
+        table.add_row(self._t("provider"), self.config.provider)
+        table.add_row(self._t("model"), self.config.model)
+        table.add_row(self._t("mode"), self.agent.state.mode)
+        table.add_row(self._t("permission"), self.permission)
+        table.add_row(self._t("language"), self.language)
+        table.add_row(self._t("context_files"), str(len(self.agent.state.context_files)))
+        table.add_row(
+            self._t("pending_changes"),
+            str(len(self.agent.state.pending_result.proposed_changes) if self.agent.state.pending_result else 0),
+        )
+        table.add_row(self._t("project_memory"), self._t("yes") if self.memory_path.exists() else self._t("no"))
         self.console.print(table)
 
     def _show_doctor(self) -> None:
-        table = Table(title="EasyAI Doctor")
+        table = Table(title=self._t("doctor_title"))
         table.add_column("Check")
         table.add_column("Result")
-        table.add_row("Workspace", str(self.root))
+        table.add_row(self._t("workspace"), str(self.root))
         table.add_row("Git install", "yes" if self.updater.is_git_install() else "no")
-        table.add_row("Config file", "yes" if (self.root / "config.yaml").exists() else "no")
+        table.add_row(self._t("config_file"), self._t("yes") if (self.app_root / "config.yaml").exists() else self._t("no"))
         table.add_row("Server URL", self.config.app_base_url)
-        table.add_row("API key", "set" if self.config.api_key or self.config.provider == "ollama" else "missing")
-        table.add_row("Ollama", self.config.ollama_base_url)
-        table.add_row("Files visible", str(len(self.workspace.list_code_files())))
-        table.add_row("Rule files", ", ".join(self._existing_rule_files()) or "none")
+        table.add_row(self._t("api_key"), "set" if self.config.api_key or self.config.provider == "ollama" else "missing")
+        table.add_row(self._t("ollama"), self.config.ollama_base_url)
+        table.add_row(self._t("files_visible"), str(len(self.workspace.list_code_files())))
+        table.add_row(self._t("rule_files"), ", ".join(self._existing_rule_files()) or self._t("none"))
         self.console.print(table)
 
     def _init_workspace(self) -> None:
@@ -751,11 +1018,11 @@ class EasyAIClient:
                 encoding="utf-8",
             )
         self._audit("init", {"path": str(self.easyai_dir)})
-        self.console.print("[green]Initialized EasyAI workspace files.[/]")
+        self.console.print("[green]%s[/]" % self._t("initialized"))
 
     def _plan_task(self, task: str) -> None:
         if not task:
-            raise ValueError("Plan task is empty.")
+            raise ValueError(self._t("plan_empty"))
         prompt = (
             "Create a concise implementation plan for this task. "
             "Do not propose file writes yet. Include risks, validation, and required context. Task: %s" % task
@@ -765,14 +1032,14 @@ class EasyAIClient:
     def _handle_memory(self, args: List[str]) -> None:
         if not args:
             text = self.memory_path.read_text(encoding="utf-8") if self.memory_path.exists() else "(empty)"
-            self.console.print(Panel(text.strip() or "(empty)", title="Project Memory", border_style="cyan"))
+            self.console.print(Panel(text.strip() or "(empty)", title=self._t("project_memory"), border_style="cyan"))
             return
         action = args[0].lower()
         if action == "add":
             self._append_memory(" ".join(args[1:]).strip())
             return
         if action == "clear":
-            if Confirm.ask("Clear project memory?", default=False):
+            if Confirm.ask(self._t("clear_memory"), default=False):
                 self.easyai_dir.mkdir(parents=True, exist_ok=True)
                 self.memory_path.write_text("# EasyAI Memory\n\n", encoding="utf-8")
                 self._audit("memory.clear", {})
@@ -781,13 +1048,13 @@ class EasyAIClient:
 
     def _quick_memory(self, text: str) -> None:
         if not text:
-            self.console.print("[yellow]Memory text is empty.[/]")
+            self.console.print("[yellow]%s[/]" % self._t("memory_empty"))
             return
         self._append_memory(text)
 
     def _append_memory(self, text: str) -> None:
         if not text:
-            raise ValueError("Memory text is empty.")
+            raise ValueError(self._t("memory_empty"))
         self.easyai_dir.mkdir(parents=True, exist_ok=True)
         if not self.memory_path.exists():
             self.memory_path.write_text("# EasyAI Memory\n\n", encoding="utf-8")
@@ -795,12 +1062,12 @@ class EasyAIClient:
         with self.memory_path.open("a", encoding="utf-8") as handle:
             handle.write("- %s %s\n" % (timestamp, text))
         self._audit("memory.add", {"text": text})
-        self.console.print("[green]Memory saved.[/]")
+        self.console.print("[green]%s[/]" % self._t("memory_saved"))
 
     def _compact_conversation(self) -> None:
         messages = self.agent.state.messages
         if len(messages) <= 6:
-            self.console.print("[yellow]Not enough conversation to compact.[/]")
+            self.console.print("[yellow]%s[/]" % self._t("not_enough_compact"))
             return
         old_messages = messages[:-4]
         summary_lines = []
@@ -812,12 +1079,12 @@ class EasyAIClient:
         self.agent.state.metadata["conversation_summary"] = combined[-5000:]
         self.agent.state.messages = messages[-4:]
         self._audit("compact", {"remaining_messages": len(self.agent.state.messages)})
-        self.console.print("[green]Conversation compacted.[/]")
+        self.console.print("[green]%s[/]" % self._t("conversation_compacted"))
 
     def _review_context(self, focus: str) -> None:
         self._require_permission("files")
         if not self.agent.state.context_files:
-            raise ValueError("Load context first with /open or /context add.")
+            raise ValueError(self._t("load_context_first"))
         prompt = (
             "Review the loaded context. Prioritize concrete bugs, security risks, regressions, and missing tests. "
             "Give file/line references when possible. Focus: %s" % (focus or "general")
@@ -825,9 +1092,9 @@ class EasyAIClient:
         self._ask_local_ai(prompt)
 
     def _list_custom_commands(self) -> None:
-        table = Table(title="Custom Commands")
+        table = Table(title=self._t("custom_commands"))
         table.add_column("Command")
-        table.add_column("File")
+        table.add_column(self._t("file"))
         for path in sorted(self.commands_dir.glob("*.md")) if self.commands_dir.exists() else []:
             table.add_row("/" + path.stem, path.relative_to(self.root).as_posix())
         if not table.rows:
