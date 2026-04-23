@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -63,3 +64,13 @@ def save_client_session(root: Path, payload: Dict[str, Any]) -> None:
     path = root / "easyai-data" / "client_session.json"
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def clear_client_session(root: Path) -> None:
+    path = root / "easyai-data" / "client_session.json"
+    if path.exists():
+        path.unlink()
+
+
+def utc_now() -> str:
+    return datetime.utcnow().isoformat(timespec="seconds") + "Z"

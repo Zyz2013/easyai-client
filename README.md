@@ -79,6 +79,22 @@ Log in with the website account. Keep this window open when you want the website
 
 Use `/help` inside EasyAI to see all local commands.
 
+## Login
+
+The first login must be verified by the server. After a successful login, EasyAI saves a local session in:
+
+```text
+easyai-data/client_session.json
+```
+
+Next startup uses the saved local account directly and does not ask for the password again. Server sync still runs in the background when the network is available.
+
+To clear the local saved account:
+
+```text
+/logout
+```
+
 ## Permission Modes
 
 EasyAI starts in safe mode.

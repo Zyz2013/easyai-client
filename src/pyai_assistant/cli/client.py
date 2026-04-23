@@ -17,7 +17,13 @@ from pyai_assistant.agent.session import AssistantAgent
 from pyai_assistant.cli.pet import TerminalPet
 from pyai_assistant.config import load_config
 from pyai_assistant.providers.factory import build_provider
-from pyai_assistant.providers.server_api import ServerApiClient, load_client_session, save_client_session
+from pyai_assistant.providers.server_api import (
+    ServerApiClient,
+    clear_client_session,
+    load_client_session,
+    save_client_session,
+    utc_now,
+)
 from pyai_assistant.runtime.computer import load_computer_identity
 from pyai_assistant.runtime.downloader import SoftwareDownloader, looks_like_download_request, parse_download_request
 from pyai_assistant.runtime.executor import PythonRunner
@@ -153,14 +159,21 @@ class EasyAIClient:
     def _ensure_login(self) -> None:
         if self.session.get("token"):
             self.api.token = self.session["token"]
+            self.console.print("[green]Using saved local account:[/] %s" % self.session.get("username", "user"))
             return
-        self.console.print("Log in with your EasyAI server account.")
+        self.console.print("First login requires server verification.")
         username = Prompt.ask("Username")
         password = Prompt.ask("Password", password=True)
         payload = self.api.login(username, password, self.computer.name)
-        self.session = {"token": payload["token"], "username": username}
+        self.session = {
+            "token": payload["token"],
+            "username": username,
+            "verified_at": utc_now(),
+            "server": self.config.app_base_url,
+        }
         save_client_session(self.root, self.session)
         self.api.token = payload["token"]
+        self.console.print("[green]Server login verified. Local account saved for next startup.[/]")
 
     def _start_background_client(self) -> None:
         self.poller = threading.Thread(target=self._poll_server_tasks, daemon=True)
@@ -239,7 +252,11 @@ class EasyAIClient:
         parts = shlex.split(raw_command)
         command = parts[0].lower()
         if command in {"/quit", "/exit", "/logout"}:
-            self.console.print("Logged out of this client session.")
+            if command == "/logout":
+                clear_client_session(self.root)
+                self.console.print("Local saved account cleared. Next startup will require server login.")
+            else:
+                self.console.print("Client stopped.")
             return True
         if command == "/help":
             self._show_help(parts[1] if len(parts) > 1 else "")
