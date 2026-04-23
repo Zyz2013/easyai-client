@@ -1,0 +1,8 @@
+preset: deepseek
+provider: openai_compatible
+model: deepseek-chat
+base_url: https://api.deepseek.com
+temperature: 0.2
+max_tokens: 1200
+app_base_url: https://xingkongtech.top
+ollama_base_url: http://localhost:11434
