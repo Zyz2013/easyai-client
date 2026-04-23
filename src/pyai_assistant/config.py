@@ -70,7 +70,7 @@ def load_config(root: Path) -> AppConfig:
     database_url = str(
         file_config.get("database_url", env.get("EASYAI_DATABASE_URL", "easyai-data/easyai.json"))
     )
-    app_base_url = str(file_config.get("app_base_url", env.get("EASYAI_APP_BASE_URL", "http://127.0.0.1:8000")))
+    app_base_url = str(file_config.get("app_base_url", env.get("EASYAI_APP_BASE_URL", "https://xingkongtech.top")))
     host = str(file_config.get("host", env.get("EASYAI_HOST", "127.0.0.1")))
     port = int(file_config.get("port", env.get("EASYAI_PORT", 8000)))
     session_cookie_secure = bool(file_config.get("session_cookie_secure", True))
