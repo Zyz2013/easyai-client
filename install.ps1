@@ -151,9 +151,23 @@ $launcher | Set-Content -Path (Join-Path $InstallRoot "Easyai.cmd") -Encoding AS
 
 Ensure-UserPath -PathToAdd $UserBin
 
+$SelfTestWorkspace = Join-Path $env:TEMP "easyai-self-test-workspace"
+New-Item -ItemType Directory -Path $SelfTestWorkspace -Force | Out-Null
+Push-Location $SelfTestWorkspace
+try {
+    & (Join-Path $UserBin "easyai.cmd") --self-test
+    if ($LASTEXITCODE -ne 0) {
+        throw "EasyAI self-test failed."
+    }
+}
+finally {
+    Pop-Location
+}
+
 Write-Section "EasyAI client installed."
 Write-Host "Install root: $InstallRoot" -ForegroundColor Green
 Write-Host "Global commands: easyai  or  Easyai" -ForegroundColor Green
+Write-Host "Self-test: passed" -ForegroundColor Green
 Write-Host "You can run EasyAI from any directory. File operations use the directory where you start it." -ForegroundColor Yellow
 Write-Host ""
 Write-Host "If this PowerShell window cannot find easyai immediately, open a new PowerShell window." -ForegroundColor Cyan

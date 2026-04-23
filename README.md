@@ -30,15 +30,15 @@ On Windows, `Easyai` also works because command lookup is case-insensitive.
 One-line install:
 
 ```powershell
-git clone https://github.com/Zyz2013/easyai-client.git EasyAI && cd EasyAI && powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1
+git clone https://github.com/Zyz2013/easyai-client.git EasyAI && EasyAI\install.cmd
 ```
 
-The installer creates a virtual environment, installs EasyAI, writes `config.yaml` and `.env`, creates global `easyai` and `Easyai` commands, and adds them to the user PATH.
+The installer creates a virtual environment, installs EasyAI, writes `config.yaml` and `.env`, creates global `easyai` and `Easyai` commands, adds them to the user PATH, and runs a local self-test from a different directory.
 
 Non-interactive install:
 
 ```powershell
-git clone https://github.com/Zyz2013/easyai-client.git EasyAI && cd EasyAI && powershell -NoProfile -ExecutionPolicy Bypass -File .\install.ps1 -NonInteractive
+git clone https://github.com/Zyz2013/easyai-client.git EasyAI && EasyAI\install.cmd -NonInteractive
 ```
 
 Local install:

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import shlex
+import sys
 import threading
 import time
 from datetime import datetime
@@ -859,5 +860,28 @@ class EasyAIClient:
             handle.write(json.dumps(event, ensure_ascii=False) + "\n")
 
 
+def run_self_test(workspace_root: Path) -> int:
+    client = EasyAIClient(workspace_root)
+    checks = [
+        ("workspace", client.root.exists(), str(client.root)),
+        ("install_root", client.app_root.exists(), str(client.app_root)),
+        ("config", client.config.app_base_url == "https://xingkongtech.top", client.config.app_base_url),
+        ("updater_root", client.updater.root == client.app_root, str(client.updater.root)),
+        ("server_api", bool(client.api.base_url), client.api.base_url),
+    ]
+    failed = False
+    for name, ok, detail in checks:
+        status = "OK" if ok else "FAIL"
+        print("%s %s: %s" % (status, name, detail))
+        failed = failed or not ok
+    return 1 if failed else 0
+
+
 def main() -> None:
+    if "--self-test" in sys.argv:
+        raise SystemExit(run_self_test(Path.cwd()))
     EasyAIClient(Path.cwd()).run()
+
+
+if __name__ == "__main__":
+    main()
