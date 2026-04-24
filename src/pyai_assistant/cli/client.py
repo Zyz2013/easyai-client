@@ -525,7 +525,7 @@ class EasyAIClient:
         self.pet = TerminalPet()
         self.stop_event = threading.Event()
         self.poller: Optional[threading.Thread] = None
-        self.permission = "safe"
+        self.permission = self._load_saved_permission()
         self.language = "zh"
         self.easyai_dir = self.root / ".easyai"
         self.memory_path = self.easyai_dir / "memory.md"
@@ -837,6 +837,7 @@ class EasyAIClient:
         if requested == "elevated" and not Confirm.ask(self._t("permission_confirm"), default=False):
             return
         self.permission = requested
+        self._save_permission(requested)
         self._audit("permission", {"mode": self.permission})
         self.console.print("[green]%s[/] %s" % (self._t("permission_set"), self.permission))
 
@@ -844,6 +845,16 @@ class EasyAIClient:
         file_config, _ = load_local_config_files(self.app_root)
         file_config.update(updates)
         file_config["model_connection_configured"] = True
+        write_local_config(self.app_root, file_config)
+
+    def _load_saved_permission(self) -> str:
+        file_config, _ = load_local_config_files(self.app_root)
+        permission = str(file_config.get("permission", "safe"))
+        return permission if permission in PERMISSION_LEVELS else "safe"
+
+    def _save_permission(self, permission: str) -> None:
+        file_config, _ = load_local_config_files(self.app_root)
+        file_config["permission"] = permission
         write_local_config(self.app_root, file_config)
 
     def _require_permission(self, required: str) -> None:
