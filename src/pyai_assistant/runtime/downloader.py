@@ -32,6 +32,7 @@ class DownloadRequest:
     query: str
     install: bool = False
     elevated: bool = False
+    install_dir: Optional[str] = None
 
 
 @dataclass
@@ -48,6 +49,7 @@ def looks_like_download_request(text: str) -> bool:
     return (
         normalized.startswith("download ")
         or normalized.startswith("install ")
+        or normalized.startswith("下载安装 ")
         or normalized.startswith("下载")
         or normalized.startswith("安装")
         or "帮我下载" in normalized
@@ -58,13 +60,27 @@ def looks_like_download_request(text: str) -> bool:
 def parse_download_request(text: str) -> DownloadRequest:
     normalized = text.strip()
     lowered = normalized.lower()
-    install = "安装" in normalized or lowered.startswith("install ")
+    install = (
+        lowered.startswith("install ")
+        or lowered.startswith("安装")
+        or lowered.startswith("下载安装")
+        or "帮我安装" in lowered
+    )
     elevated = any(token in lowered for token in ["--admin", "--elevated", "administrator", "管理员"])
+
+    install_dir = None
+    english_match = re.search(r"\s+to\s+(.+)$", normalized, flags=re.I)
+    chinese_match = re.search(r"到\s*(.+)$", normalized)
+    target_match = english_match or chinese_match
+    if target_match:
+        install_dir = target_match.group(1).strip().strip("\"'")
+        normalized = normalized[: target_match.start()].strip()
+
     query = re.sub(r"^(please\s+)?(download|install)\s+", "", normalized, flags=re.I)
-    query = re.sub(r"^(请)?帮我(下载|安装)", "", query)
-    query = re.sub(r"^(下载|安装)", "", query)
+    query = re.sub(r"^(帮我(下载|安装|下载安装))", "", query)
+    query = re.sub(r"^(下载|安装|下载安装)", "", query)
     query = query.replace("--admin", "").replace("--elevated", "").replace("管理员", "")
-    return DownloadRequest(query=query.strip(), install=install, elevated=elevated)
+    return DownloadRequest(query=query.strip(), install=install, elevated=elevated, install_dir=install_dir)
 
 
 class SoftwareDownloader:
@@ -99,7 +115,7 @@ class SoftwareDownloader:
             raise RuntimeError(output or "winget search failed.")
         return DownloadResult(message=output, command=command)
 
-    def winget_install(self, query: str, elevated: bool = False) -> DownloadResult:
+    def winget_install(self, query: str, elevated: bool = False, install_dir: Optional[str] = None) -> DownloadResult:
         package_id = self.resolve_package_id(query)
         command = [
             "winget",
@@ -109,7 +125,13 @@ class SoftwareDownloader:
             "--accept-package-agreements",
             "--accept-source-agreements",
         ]
+        target_dir = self._resolve_install_dir(install_dir) if install_dir else None
+        if target_dir:
+            command.extend(["--location", str(target_dir)])
         if elevated:
+            argument_list = "install --id %s --accept-package-agreements --accept-source-agreements" % package_id
+            if target_dir:
+                argument_list += ' --location "%s"' % str(target_dir)
             powershell_command = [
                 "powershell",
                 "-NoProfile",
@@ -117,7 +139,7 @@ class SoftwareDownloader:
                 "Start-Process",
                 "winget",
                 "-ArgumentList",
-                "'install --id %s --accept-package-agreements --accept-source-agreements'" % package_id,
+                "'%s'" % argument_list,
                 "-Verb",
                 "RunAs",
                 "-Wait",
@@ -130,6 +152,15 @@ class SoftwareDownloader:
         if completed.returncode != 0:
             raise RuntimeError(output or "winget install failed.")
         return DownloadResult(message=output or "Install completed.", command=command)
+
+    def _resolve_install_dir(self, raw_path: str) -> Path:
+        target = Path(raw_path).expanduser()
+        if not target.is_absolute():
+            target = (self.root / target).resolve()
+        else:
+            target = target.resolve()
+        target.mkdir(parents=True, exist_ok=True)
+        return target
 
     def _filename_from_url(self, url: str) -> str:
         parsed = urllib.parse.urlparse(url)

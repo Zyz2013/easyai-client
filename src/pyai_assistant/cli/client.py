@@ -926,6 +926,29 @@ HELP_PAGES["zh"]["files"] = HELP_PAGES["zh"]["files"].replace(
     "说明\n  /open 会同时打开并加入上下文。",
     "说明\n  /cd 会切换当前工作目录，并自动保存旧目录会话、加载新目录会话。\n  /open 会同时打开并加入上下文。",
 )
+HELP_PAGES["zh"]["download"] = """\
+下载与安装
+作用
+  下载文件，或直接用自然语言安装软件。默认安装走系统默认目录，也支持指定自定义目录。
+
+使用方法
+  安装 某个软件
+  安装 某个软件 到 某个目录
+  /download <软件名> --install
+  /download <软件名> --install --to <目录>
+  /download <URL>
+
+示例
+  安装 VS Code
+  安装 Python 到 D:/Apps/Python
+  安装 Chrome 到 D:/Portable/Chrome
+  /download python --install --to D:/Apps/Python
+
+说明
+  直接说“安装某某软件”时，会默认安装到系统默认目录。
+  直接说“安装某某软件到某个目录”时，会把该目录作为安装位置传给 winget。
+  安装和管理员权限操作仍然会再次确认。
+"""
 HELP_PAGES["en"][""] = HELP_PAGES["en"][""].replace(
     "  2. /open app.py\n  3. /mode edit\n  4. describe the change you want\n  5. /apply\n  6. /run pytest tests",
     "  2. /cd D:/MyProject\n  3. /open app.py\n  4. /mode edit\n  5. describe the change you want\n  6. /apply\n  7. /run pytest tests",
@@ -940,6 +963,29 @@ HELP_PAGES["en"]["files"] = HELP_PAGES["en"]["files"].replace(
     "Notes\n  /open both shows the file and adds it to context.",
     "Notes\n  /cd switches the current workspace, saves the old workspace session, and restores the new one.\n  /open both shows the file and adds it to context.",
 )
+HELP_PAGES["en"]["download"] = """\
+Download and install
+Purpose
+  Download files or install software directly with natural language. Plain install uses the default system location, and a custom target directory is also supported.
+
+How to use
+  install <software name>
+  install <software name> to <directory>
+  /download <software name> --install
+  /download <software name> --install --to <directory>
+  /download <URL>
+
+Examples
+  install VS Code
+  install Python to D:/Apps/Python
+  install Chrome to D:/Portable/Chrome
+  /download python --install --to D:/Apps/Python
+
+Notes
+  Saying "install <software>" uses the default system install location.
+  Saying "install <software> to <directory>" passes that directory to winget as the install location.
+  Install and admin actions still ask for confirmation.
+"""
 
 
 class EasyAIClient:
@@ -1349,16 +1395,22 @@ class EasyAIClient:
     def _handle_download_text(self, text: str) -> None:
         self._require_permission("downloads")
         request = parse_download_request(text)
-        self._perform_download(request.query, request.install, request.elevated)
+        self._perform_download(request.query, request.install, request.elevated, request.install_dir)
 
     def _handle_download_parts(self, args: List[str]) -> None:
         self._require_permission("downloads")
         install = "--install" in args
         elevated = "--admin" in args or "--elevated" in args
-        query = " ".join(item for item in args if item not in {"--install", "--admin", "--elevated"}).strip()
-        self._perform_download(query, install, elevated)
+        install_dir = None
+        cleaned_args = [item for item in args if item not in {"--install", "--admin", "--elevated"}]
+        if "--to" in cleaned_args:
+            marker_index = cleaned_args.index("--to")
+            install_dir = " ".join(cleaned_args[marker_index + 1 :]).strip() or None
+            cleaned_args = cleaned_args[:marker_index]
+        query = " ".join(cleaned_args).strip()
+        self._perform_download(query, install, elevated, install_dir)
 
-    def _perform_download(self, query: str, install: bool, elevated: bool) -> None:
+    def _perform_download(self, query: str, install: bool, elevated: bool, install_dir: Optional[str] = None) -> None:
         if not query:
             raise ValueError(self._t("download_empty"))
         if self.downloader.is_url(query):
@@ -1374,8 +1426,8 @@ class EasyAIClient:
                 return
             if elevated and not Confirm.ask(self._t("admin_confirm", query=query), default=False):
                 return
-            result = self.downloader.winget_install(query, elevated=elevated)
-            self._audit("install", {"query": query, "elevated": elevated})
+            result = self.downloader.winget_install(query, elevated=elevated, install_dir=install_dir)
+            self._audit("install", {"query": query, "elevated": elevated, "install_dir": install_dir})
             self.console.print(Panel(result.message, title="Install", border_style="green"))
             return
         if Confirm.ask(self._t("search_confirm", query=query), default=True):
