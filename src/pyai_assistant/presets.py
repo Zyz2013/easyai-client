@@ -27,7 +27,7 @@ API_PRESETS: Dict[str, ApiPreset] = {
         name="deepseek",
         provider="openai_compatible",
         base_url="https://api.deepseek.com",
-        default_model="deepseek-chat",
+        default_model="deepseek-v4-flash",
         api_key_env="DEEPSEEK_API_KEY",
         description="DeepSeek 官方兼容接口",
     ),
@@ -54,3 +54,24 @@ def get_api_preset(name: Optional[str]) -> Optional[ApiPreset]:
     if not name:
         return None
     return API_PRESETS.get(name.strip().lower())
+
+
+def normalize_model_name(base_url: str, model: str) -> str:
+    cleaned = (model or "").strip()
+    if not cleaned:
+        return cleaned
+
+    if "api.deepseek.com" not in base_url.lower():
+        return cleaned
+
+    aliases = {
+        "deepseek chat": "deepseek-chat",
+        "deepseek-chat": "deepseek-chat",
+        "deepseek reasoner": "deepseek-reasoner",
+        "deepseek-reasoner": "deepseek-reasoner",
+        "deepseek v4 flash": "deepseek-v4-flash",
+        "deepseek-v4-flash": "deepseek-v4-flash",
+        "deepseek v4 pro": "deepseek-v4-pro",
+        "deepseek-v4-pro": "deepseek-v4-pro",
+    }
+    return aliases.get(cleaned.lower(), cleaned)

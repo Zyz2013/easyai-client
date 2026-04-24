@@ -4,6 +4,7 @@ import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Dict
 
 
 @dataclass
@@ -45,7 +46,11 @@ class GitUpdater:
         return UpdateStatus(local != remote, local[:7], remote[:7])
 
     def update(self) -> str:
-        self._git(["pull", "--ff-only", "origin", "main"])
+        saved_files = self._preserve_local_files(["config.yaml", ".env", "easyai-data/client_session.json"])
+        try:
+            self._git(["pull", "--ff-only", "origin", "main"])
+        finally:
+            self._restore_local_files(saved_files)
         venv_python = self.root / ".venv" / "Scripts" / "python.exe"
         python_executable = str(venv_python) if venv_python.exists() else sys.executable
         completed = self._run_process(
@@ -75,3 +80,17 @@ class GitUpdater:
             errors="replace",
             timeout=timeout,
         )
+
+    def _preserve_local_files(self, relative_paths: list) -> Dict[str, bytes]:
+        saved: Dict[str, bytes] = {}
+        for relative in relative_paths:
+            path = self.root / relative
+            if path.exists() and path.is_file():
+                saved[relative] = path.read_bytes()
+        return saved
+
+    def _restore_local_files(self, saved: Dict[str, bytes]) -> None:
+        for relative, data in saved.items():
+            path = self.root / relative
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_bytes(data)

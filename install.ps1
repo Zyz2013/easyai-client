@@ -97,7 +97,7 @@ function Preset-Config {
         default {
             return @{
                 provider = "openai_compatible"
-                model = "deepseek-chat"
+                model = "deepseek-v4-flash"
                 base_url = "https://api.deepseek.com"
                 key_name = "DEEPSEEK_API_KEY"
             }

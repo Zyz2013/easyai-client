@@ -6,7 +6,7 @@ from typing import Dict, Tuple
 
 import yaml
 
-from pyai_assistant.presets import get_api_preset
+from pyai_assistant.presets import get_api_preset, normalize_model_name
 from pyai_assistant.types import AppConfig
 
 
@@ -59,6 +59,7 @@ def load_config(root: Path) -> AppConfig:
     provider = str(file_config.get("provider", preset.provider if preset else "openai_compatible"))
     base_url = str(file_config.get("base_url", preset.base_url if preset else "https://api.openai.com/v1"))
     model = str(file_config.get("model", preset.default_model if preset else "gpt-4o-mini"))
+    model = normalize_model_name(base_url, model)
     temperature = float(file_config.get("temperature", 0.2))
     max_tokens = int(file_config.get("max_tokens", 1200))
     allow_auto_run = bool(file_config.get("allow_auto_run", False))
