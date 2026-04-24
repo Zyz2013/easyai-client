@@ -46,8 +46,10 @@ class GitUpdater:
         return UpdateStatus(local != remote, local[:7], remote[:7])
 
     def update(self) -> str:
-        saved_files = self._preserve_local_files(["config.yaml", ".env", "easyai-data/client_session.json"])
+        protected_files = ["config.yaml", ".env", "easyai-data/client_session.json"]
+        saved_files = self._preserve_local_files(protected_files)
         try:
+            self._discard_local_files(protected_files)
             self._git(["pull", "--ff-only", "origin", "main"])
         finally:
             self._restore_local_files(saved_files)
@@ -94,3 +96,9 @@ class GitUpdater:
             path = self.root / relative
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
+
+    def _discard_local_files(self, relative_paths: list) -> None:
+        existing = [relative for relative in relative_paths if (self.root / relative).exists()]
+        if not existing:
+            return
+        self._git(["checkout", "--", *existing])

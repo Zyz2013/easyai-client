@@ -1,6 +1,6 @@
 preset: deepseek
 provider: openai_compatible
-model: deepseek-chat
+model: deepseek-v4-flash
 base_url: https://api.deepseek.com
 temperature: 0.2
 max_tokens: 1200
