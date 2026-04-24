@@ -1057,8 +1057,12 @@ class EasyAIClient:
                     self._save_runtime_state()
                 continue
             if looks_like_download_request(user_input):
-                self._handle_download_text(user_input)
-                self._save_runtime_state()
+                try:
+                    self._handle_download_text(user_input)
+                except Exception as exc:
+                    self.console.print("[red]%s[/] %s" % (self._t("command_failed"), exc))
+                else:
+                    self._save_runtime_state()
                 continue
             self._ask_local_ai(user_input)
             self._save_runtime_state()
