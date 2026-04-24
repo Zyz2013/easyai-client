@@ -33,7 +33,7 @@ from pyai_assistant.runtime.computer import load_computer_identity
 from pyai_assistant.runtime.downloader import SoftwareDownloader, looks_like_download_request, parse_download_request
 from pyai_assistant.runtime.executor import PythonRunner
 from pyai_assistant.runtime.updater import GitUpdater
-from pyai_assistant.types import AssistantResult, RunRequest
+from pyai_assistant.types import AssistantResult, Message, RunRequest, SessionState, WorkspaceChange
 from pyai_assistant.workspace.manager import WorkspaceManager
 
 
@@ -290,6 +290,7 @@ Agent 工作区能力
         "help_topics_line": "Topics: files, run, pet, download, account, permission, agent",
         "help_examples_title": "Common examples",
         "help_unknown_topic": "Unknown help topic: {topic}",
+        "session_restored": "Restored saved workspace state from .easyai/runtime-state.json.",
         "update_check": "Checking for updates...",
         "update_unavailable": "Automatic update check unavailable:",
         "update_available": "Update available {local} -> {remote}. Update now?",
@@ -534,6 +535,379 @@ Project rule files loaded automatically: AGENTS.md, CLAUDE.md, EASYAI.md, .easya
 """,
 }
 
+HELP_PAGES: Dict[str, Dict[str, str]] = {
+    "zh": {
+        "": """\
+帮助总览
+作用
+  /help 用来查看命令的用途、适合什么场景、以及具体怎么输入。
+
+使用方法
+  /help files
+  /help run
+  /help pet
+  /help download
+  /help account
+  /help permission
+  /help agent
+
+主题说明
+  files        文件浏览、打开文件、管理上下文、重置会话
+  run          运行 Python/pytest/node 等验证命令
+  pet          查看或切换宠物状态
+  download     下载软件、搜索 winget、确认安装
+  account      语言、模型来源、模型名、模式、登录退出
+  permission   查看和切换权限级别
+  agent        状态、诊断、初始化、记忆、压缩、审查、自定义命令
+
+常见流程
+  1. /permission files
+  2. /open app.py
+  3. /mode edit
+  4. 直接描述你要改什么
+  5. /apply
+  6. /run pytest tests
+""",
+        "files": """\
+文件与上下文
+作用
+  让 EasyAI 读取当前项目文件，并把这些文件作为后续对话上下文。
+
+使用方法
+  /files
+  /open <文件路径>
+  /context add <文件路径>
+  /context remove <文件路径>
+  /reset
+
+示例
+  /open src/app.py
+  /context add tests/test_app.py
+  /context remove tests/test_app.py
+
+说明
+  /open 会同时打开并加入上下文。
+  /context add/remove 只管理上下文，不显示文件内容。
+  /reset 会清空当前会话、上下文和待应用修改。
+""",
+        "run": """\
+运行与验证
+作用
+  在受控环境里运行验证命令，检查修改是否真的可用。
+
+使用方法
+  /run demo.py
+  /run python demo.py arg1
+  /run pytest tests
+  /run node index.js
+  /run npm test
+
+示例
+  /run pytest tests/test_login.py
+  /run python scripts/demo.py
+
+说明
+  这里只允许受控命令，不执行任意 shell。
+  npm/pnpm/yarn/bun 默认会拦截 install/add/remove/publish/exec 这类高风险动作。
+""",
+        "pet": """\
+宠物功能
+作用
+  显示 EasyAI 的终端宠物状态，辅助观察当前是否在思考、空闲或报错。
+
+使用方法
+  /pet
+  /pet status
+  /pet on
+  /pet off
+
+示例
+  /pet off
+  /pet on
+""",
+        "download": """\
+下载与安装
+作用
+  下载文件，或通过 winget 搜索并安装软件。
+
+使用方法
+  /download <软件名>
+  /download <URL>
+  /download <软件名> --install
+  /download <软件名> --install --admin
+  也可以直接输入自然语言，例如：下载 VS Code
+
+示例
+  /download chrome
+  /download https://example.com/file.exe
+  /download python --install
+  下载微信
+
+说明
+  普通下载默认保存到当前工作区 downloads/。
+  软件名会优先走 winget 搜索/安装流程。
+  安装和管理员权限操作都会再次确认。
+""",
+        "account": """\
+账号与模型
+作用
+  管理语言、模型连接、模型名、会话模式，以及登录状态。
+
+使用方法
+  /language zh
+  /language en
+  /provider openai_compatible
+  /provider ollama
+  /model <模型名>
+  /mode chat|code|edit
+  /logout
+  /quit
+
+示例
+  /provider ollama
+  /model deepseek-v4-flash
+  /mode edit
+
+说明
+  语言、模型连接和权限都会保留上次配置。
+  启动时会先询问是否继续使用旧的模型连接配置。
+  首次登录必须通过服务端验证。
+""",
+        "permission": """\
+权限管理
+作用
+  决定 EasyAI 当前允许做到哪一步。
+
+使用方法
+  /permission
+  /permission safe
+  /permission files
+  /permission downloads
+  /permission elevated
+
+权限说明
+  safe        只聊天和服务端同步
+  files       允许读写文件、应用修改、运行验证
+  downloads   在 files 基础上允许下载和安装流程
+  elevated    在 downloads 基础上允许管理员安装提示
+
+说明
+  权限会保存，下次启动自动沿用。
+  即使已经提权，高风险操作仍然会再次确认。
+""",
+        "agent": """\
+Agent 工作区能力
+作用
+  查看状态、做诊断、初始化规则文件、保存记忆、压缩会话、做代码审查。
+
+使用方法
+  /status
+  /doctor
+  /init
+  /plan <任务>
+  /memory
+  /memory add <内容>
+  /compact
+  /review [重点]
+  /commands
+  /<自定义命令> [参数]
+
+示例
+  /plan 给登录流程补充错误处理
+  /memory add 这个项目优先兼容 Windows
+  /review 安全问题
+
+说明
+  # <内容> 等同于快速执行 /memory add <内容>。
+  会自动读取 AGENTS.md、CLAUDE.md、EASYAI.md、.easyai/memory.md。
+  对话和当前进度会实时保存到 .easyai/runtime-state.json，突然退出后下次会恢复。
+""",
+    },
+    "en": {
+        "": """\
+Help overview
+Purpose
+  /help explains what a command does, when to use it, and the exact input format.
+
+How to use
+  /help files
+  /help run
+  /help pet
+  /help download
+  /help account
+  /help permission
+  /help agent
+
+Topics
+  files        Browse files, open files, manage context, reset session
+  run          Run Python, pytest, Node, and test commands
+  pet          Show or toggle the pet state
+  download     Download software, search winget, confirm installs
+  account      Language, provider, model, mode, login/logout
+  permission   Show and switch permission levels
+  agent        Status, doctor, init, memory, compact, review, custom commands
+
+Common flow
+  1. /permission files
+  2. /open app.py
+  3. /mode edit
+  4. describe the change you want
+  5. /apply
+  6. /run pytest tests
+""",
+        "files": """\
+Files and context
+Purpose
+  Let EasyAI read project files and use them as context for the next turns.
+
+How to use
+  /files
+  /open <path>
+  /context add <path>
+  /context remove <path>
+  /reset
+
+Examples
+  /open src/app.py
+  /context add tests/test_app.py
+  /context remove tests/test_app.py
+
+Notes
+  /open both shows the file and adds it to context.
+  /context add/remove only manages context.
+  /reset clears the active session, context, and pending changes.
+""",
+        "run": """\
+Run and validation
+Purpose
+  Run controlled validation commands so we can confirm the change actually works.
+
+How to use
+  /run demo.py
+  /run python demo.py arg1
+  /run pytest tests
+  /run node index.js
+  /run npm test
+
+Examples
+  /run pytest tests/test_login.py
+  /run python scripts/demo.py
+
+Notes
+  This only allows controlled commands, not arbitrary shell.
+  npm/pnpm/yarn/bun block risky install/add/remove/publish/exec actions by default.
+""",
+        "pet": """\
+Pet
+Purpose
+  Show EasyAI's terminal pet so you can see whether it is idle, thinking, or in an error state.
+
+How to use
+  /pet
+  /pet status
+  /pet on
+  /pet off
+""",
+        "download": """\
+Download and install
+Purpose
+  Download files or search/install software with winget.
+
+How to use
+  /download <software name>
+  /download <URL>
+  /download <software name> --install
+  /download <software name> --install --admin
+  You can also use natural language, for example: download VS Code
+
+Examples
+  /download chrome
+  /download https://example.com/file.exe
+  /download python --install
+  download WeChat
+
+Notes
+  Plain downloads go into the current workspace downloads/ folder.
+  Software names use winget search/install flows first.
+  Install and admin actions always ask for confirmation.
+""",
+        "account": """\
+Account and model
+Purpose
+  Manage language, model connection, model name, chat mode, and login state.
+
+How to use
+  /language zh
+  /language en
+  /provider openai_compatible
+  /provider ollama
+  /model <model name>
+  /mode chat|code|edit
+  /logout
+  /quit
+
+Examples
+  /provider ollama
+  /model deepseek-v4-flash
+  /mode edit
+
+Notes
+  Language, model connection, and permission reuse the last saved config.
+  Startup asks whether to keep the previous model connection.
+  The first login must be verified by the server.
+""",
+        "permission": """\
+Permission
+Purpose
+  Decide how far EasyAI is allowed to go in the current session.
+
+How to use
+  /permission
+  /permission safe
+  /permission files
+  /permission downloads
+  /permission elevated
+
+Levels
+  safe        Chat and server sync only
+  files       File read/write, apply changes, run validation
+  downloads   files plus download and install flows
+  elevated    downloads plus admin install prompts
+
+Notes
+  Permission is saved and reused on next startup.
+  High-risk actions still ask for confirmation.
+""",
+        "agent": """\
+Agent workspace features
+Purpose
+  Inspect status, run diagnostics, initialize rule files, keep project memory, compact chat, and review code.
+
+How to use
+  /status
+  /doctor
+  /init
+  /plan <task>
+  /memory
+  /memory add <text>
+  /compact
+  /review [focus]
+  /commands
+  /<custom> [args]
+
+Examples
+  /plan add better error handling to login
+  /memory add This project should stay Windows-friendly
+  /review security issues
+
+Notes
+  # <text> is a shortcut for /memory add <text>.
+  EasyAI auto-loads AGENTS.md, CLAUDE.md, EASYAI.md, and .easyai/memory.md.
+  Conversation and progress are saved live in .easyai/runtime-state.json and restored after abrupt exits.
+""",
+    },
+}
+
 
 class EasyAIClient:
     def __init__(self, root: Path) -> None:
@@ -545,7 +919,14 @@ class EasyAIClient:
         self.session = load_client_session(self.app_root)
         self.api = ServerApiClient(self.config.app_base_url, self.session.get("token"))
         self.workspace = WorkspaceManager(self.root)
-        self.agent = AssistantAgent(build_provider(self.config.provider), self.config, self.workspace)
+        self.easyai_dir = self.root / ".easyai"
+        self.memory_path = self.easyai_dir / "memory.md"
+        self.commands_dir = self.easyai_dir / "commands"
+        self.audit_path = self.easyai_dir / "audit.log"
+        self.runtime_state_path = self.easyai_dir / "runtime-state.json"
+        restored_state = self._load_runtime_state()
+        self.restored_runtime_state = self._has_runtime_state_data(restored_state)
+        self.agent = AssistantAgent(build_provider(self.config.provider), self.config, self.workspace, state=restored_state)
         self.runner = PythonRunner(self.workspace)
         self.downloader = SoftwareDownloader(self.root)
         self.updater = GitUpdater(self.app_root)
@@ -554,10 +935,6 @@ class EasyAIClient:
         self.poller: Optional[threading.Thread] = None
         self.permission = self._load_saved_permission()
         self.language = "zh"
-        self.easyai_dir = self.root / ".easyai"
-        self.memory_path = self.easyai_dir / "memory.md"
-        self.commands_dir = self.easyai_dir / "commands"
-        self.audit_path = self.easyai_dir / "audit.log"
 
     def run(self) -> None:
         self._choose_language()
@@ -566,6 +943,13 @@ class EasyAIClient:
         self._ensure_login()
         self._start_background_client()
         self._render_header()
+        if self.restored_runtime_state:
+            restored_message = (
+                "已恢复 .easyai/runtime-state.json 中保存的工作区状态。"
+                if self.language == "zh"
+                else self._t("session_restored")
+            )
+            self.console.print("[green]%s[/]" % restored_message)
         while True:
             try:
                 user_input = Prompt.ask("[bold cyan]%s@easyai[/] " % self.session.get("username", "user"))
@@ -578,19 +962,25 @@ class EasyAIClient:
                 continue
             if user_input.lstrip().startswith("#"):
                 self._quick_memory(user_input.lstrip()[1:].strip())
+                self._save_runtime_state()
                 continue
             if user_input.startswith("/"):
                 try:
-                    if self._handle_command(user_input):
+                    should_exit = self._handle_command(user_input)
+                    if should_exit:
                         self.stop_event.set()
                         return
                 except Exception as exc:
                     self.console.print("[red]%s[/] %s" % (self._t("command_failed"), exc))
+                else:
+                    self._save_runtime_state()
                 continue
             if looks_like_download_request(user_input):
                 self._handle_download_text(user_input)
+                self._save_runtime_state()
                 continue
             self._ask_local_ai(user_input)
+            self._save_runtime_state()
 
     def _choose_language(self) -> None:
         saved = str(self.session.get("language", "")).lower()
@@ -682,6 +1072,7 @@ class EasyAIClient:
         self.console.print("[cyan]%s %s.[/] %s" % (self._t("task_received"), task_id, prompt))
         try:
             result = self.agent.ask(prompt)
+            self._save_runtime_state()
             self.api.complete_task(task_id, response=result.message)
             self.console.print("[green]%s %s.[/]" % (self._t("task_completed"), task_id))
         except Exception as exc:
@@ -718,6 +1109,7 @@ class EasyAIClient:
             self.pet.set_state("thinking", self._t("preparing"))
             self._render_pet()
             result = self.agent.ask(prompt)
+            self._save_runtime_state()
         except Exception as exc:
             self.pet.set_state("error", self._t("request_failed"))
             self._render_pet()
@@ -844,14 +1236,16 @@ class EasyAIClient:
 
     def _show_help(self, topic: str = "") -> None:
         topic_key = topic.lower().strip()
-        help_key = "help_%s" % topic_key if topic_key else "help_short"
-        if help_key in TEXT[self.language]:
-            text = self._t(help_key)
+        pages = HELP_PAGES.get(self.language, HELP_PAGES["en"])
+        if topic_key in pages:
+            text = pages[topic_key]
+        elif topic_key == "":
+            text = pages[""]
         else:
             text = "%s\n\n%s\n%s" % (
                 self._t("help_unknown_topic", topic=topic_key),
                 self._t("help_topics_line"),
-                self._t("help_short"),
+                pages[""],
             )
         self.console.print(Panel(text.rstrip(), title=self._t("help_title"), border_style="cyan"))
 
@@ -1185,6 +1579,164 @@ class EasyAIClient:
         }
         with self.audit_path.open("a", encoding="utf-8") as handle:
             handle.write(json.dumps(event, ensure_ascii=False) + "\n")
+
+    def _load_runtime_state(self) -> SessionState:
+        if not self.runtime_state_path.exists():
+            return SessionState(mode=self.config.default_mode)
+        try:
+            payload = json.loads(self.runtime_state_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError, TypeError):
+            return SessionState(mode=self.config.default_mode)
+        if not isinstance(payload, dict):
+            return SessionState(mode=self.config.default_mode)
+
+        mode = str(payload.get("mode", self.config.default_mode))
+        if mode not in {"chat", "code", "edit"}:
+            mode = self.config.default_mode
+
+        context_files: List[Path] = []
+        for raw_path in payload.get("context_files", []):
+            if not isinstance(raw_path, str):
+                continue
+            path = Path(raw_path)
+            if not path.is_absolute():
+                path = self.root / raw_path
+            try:
+                path = path.resolve()
+            except OSError:
+                pass
+            if path.exists():
+                context_files.append(path)
+
+        messages: List[Message] = []
+        for item in payload.get("messages", []):
+            if not isinstance(item, dict):
+                continue
+            role = item.get("role")
+            content = item.get("content")
+            if role in {"system", "user", "assistant"} and isinstance(content, str):
+                messages.append(Message(role=role, content=content))
+
+        metadata = payload.get("metadata", {})
+        if not isinstance(metadata, dict):
+            metadata = {}
+
+        return SessionState(
+            mode=mode,
+            context_files=context_files,
+            messages=messages,
+            pending_result=self._deserialize_result(payload.get("pending_result")),
+            applied_changes=self._deserialize_changes(payload.get("applied_changes", [])),
+            metadata={str(key): str(value) for key, value in metadata.items()},
+        )
+
+    def _save_runtime_state(self) -> None:
+        self.easyai_dir.mkdir(parents=True, exist_ok=True)
+        payload = {
+            "mode": self.agent.state.mode,
+            "context_files": [self._serialize_path(path) for path in self.agent.state.context_files],
+            "messages": [{"role": message.role, "content": message.content} for message in self.agent.state.messages],
+            "pending_result": self._serialize_result(self.agent.state.pending_result),
+            "applied_changes": [self._serialize_change(change) for change in self.agent.state.applied_changes],
+            "metadata": dict(self.agent.state.metadata),
+        }
+        temp_path = self.runtime_state_path.with_suffix(".tmp")
+        temp_path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")
+        temp_path.replace(self.runtime_state_path)
+
+    def _serialize_path(self, path: Path) -> str:
+        try:
+            return path.resolve().relative_to(self.root).as_posix()
+        except ValueError:
+            return str(path.resolve())
+
+    def _serialize_result(self, result: Optional[AssistantResult]) -> Optional[dict]:
+        if result is None:
+            return None
+        return {
+            "message": result.message,
+            "proposed_changes": [self._serialize_change(change) for change in result.proposed_changes],
+            "suggested_run": self._serialize_run_request(result.suggested_run),
+            "raw_response": result.raw_response,
+        }
+
+    def _deserialize_result(self, payload: object) -> Optional[AssistantResult]:
+        if not isinstance(payload, dict):
+            return None
+        message = payload.get("message")
+        if not isinstance(message, str):
+            return None
+        raw_response = payload.get("raw_response")
+        return AssistantResult(
+            message=message,
+            proposed_changes=self._deserialize_changes(payload.get("proposed_changes", [])),
+            suggested_run=self._deserialize_run_request(payload.get("suggested_run")),
+            raw_response=raw_response if isinstance(raw_response, str) else None,
+        )
+
+    def _serialize_change(self, change: WorkspaceChange) -> dict:
+        return {
+            "path": change.path,
+            "original_text": change.original_text,
+            "updated_text": change.updated_text,
+            "diff_text": change.diff_text,
+            "intent": change.intent,
+        }
+
+    def _deserialize_changes(self, payload: object) -> List[WorkspaceChange]:
+        if not isinstance(payload, list):
+            return []
+        changes: List[WorkspaceChange] = []
+        for item in payload:
+            if not isinstance(item, dict):
+                continue
+            path = item.get("path")
+            original_text = item.get("original_text")
+            updated_text = item.get("updated_text")
+            diff_text = item.get("diff_text")
+            intent = item.get("intent", "")
+            if not all(isinstance(value, str) for value in (path, original_text, updated_text, diff_text)):
+                continue
+            changes.append(
+                WorkspaceChange(
+                    path=path,
+                    original_text=original_text,
+                    updated_text=updated_text,
+                    diff_text=diff_text,
+                    intent=intent if isinstance(intent, str) else "",
+                )
+            )
+        return changes
+
+    def _serialize_run_request(self, request: Optional[RunRequest]) -> Optional[dict]:
+        if request is None:
+            return None
+        return {
+            "command_type": request.command_type,
+            "target": request.target,
+            "args": list(request.args),
+        }
+
+    def _deserialize_run_request(self, payload: object) -> Optional[RunRequest]:
+        if not isinstance(payload, dict):
+            return None
+        command_type = payload.get("command_type")
+        target = payload.get("target")
+        args = payload.get("args", [])
+        if not isinstance(command_type, str) or not isinstance(target, str) or not isinstance(args, list):
+            return None
+        if not all(isinstance(arg, str) for arg in args):
+            return None
+        return RunRequest(command_type=command_type, target=target, args=args)  # type: ignore[arg-type]
+
+    def _has_runtime_state_data(self, state: SessionState) -> bool:
+        return bool(
+            state.context_files
+            or state.messages
+            or state.pending_result
+            or state.applied_changes
+            or state.metadata
+        )
 
 
 def run_self_test(workspace_root: Path) -> int:
