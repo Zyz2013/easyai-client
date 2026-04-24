@@ -48,11 +48,8 @@ class GitUpdater:
         self._git(["pull", "--ff-only", "origin", "main"])
         venv_python = self.root / ".venv" / "Scripts" / "python.exe"
         python_executable = str(venv_python) if venv_python.exists() else sys.executable
-        completed = subprocess.run(
+        completed = self._run_process(
             [python_executable, "-m", "pip", "install", "-e", "."],
-            cwd=str(self.root),
-            capture_output=True,
-            text=True,
             timeout=300,
         )
         if completed.returncode != 0:
@@ -60,13 +57,21 @@ class GitUpdater:
         return completed.stdout.strip()
 
     def _git(self, args: list) -> str:
-        completed = subprocess.run(
+        completed = self._run_process(
             ["git"] + args,
-            cwd=str(self.root),
-            capture_output=True,
-            text=True,
             timeout=120,
         )
         if completed.returncode != 0:
             raise RuntimeError(completed.stderr.strip() or completed.stdout.strip() or "git command failed")
         return completed.stdout.strip()
+
+    def _run_process(self, command: list, timeout: int) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            command,
+            cwd=str(self.root),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+        )
