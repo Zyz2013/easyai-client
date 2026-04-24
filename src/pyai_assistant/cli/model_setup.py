@@ -8,6 +8,7 @@ from rich.panel import Panel
 from rich.prompt import Confirm
 from rich.prompt import Prompt
 
+from pyai_assistant.cli.secret_input import prompt_secret
 from pyai_assistant.config import load_config, load_local_config_files, write_dotenv, write_local_config
 from pyai_assistant.presets import get_api_preset
 from pyai_assistant.providers.http import get_json
@@ -26,6 +27,8 @@ def has_model_connection(config: AppConfig) -> Tuple[bool, str]:
         return False, "API key is missing."
     if not config.base_url or not config.model:
         return False, "API base URL or model is missing."
+    if not config.api_key.isascii() or any(ch.isspace() for ch in config.api_key):
+        return False, "API key contains invalid characters."
     return True, "API configuration exists."
 
 
@@ -86,7 +89,7 @@ def ensure_model_connection(root: Path, console: Console, language: str = "zh") 
     if provider_choice == "ollama":
         _configure_ollama(file_config, env_values, language)
     else:
-        _configure_api(file_config, env_values, language)
+        _configure_api(console, file_config, env_values, language)
 
     file_config["model_connection_configured"] = True
     write_local_config(root, file_config)
@@ -94,7 +97,7 @@ def ensure_model_connection(root: Path, console: Console, language: str = "zh") 
     return load_config(root)
 
 
-def _configure_api(file_config: Dict[str, object], env_values: Dict[str, str], language: str) -> None:
+def _configure_api(console: Console, file_config: Dict[str, object], env_values: Dict[str, str], language: str) -> None:
     preset_choice = Prompt.ask(
         "API preset / API 预设" if language == "zh" else "API preset",
         choices=["deepseek", "openrouter", "openai", "custom"],
@@ -117,9 +120,20 @@ def _configure_api(file_config: Dict[str, object], env_values: Dict[str, str], l
         file_config["model"] = Prompt.ask("Model / 模型" if language == "zh" else "Model", default=preset.default_model)
         env_key = preset.api_key_env or "OPENAI_COMPATIBLE_API_KEY"
 
-    api_key = Prompt.ask("API Key", password=True, default=env_values.get(env_key, ""))
-    if api_key:
+    existing_key = env_values.get(env_key, "").strip()
+    while True:
+        api_key = prompt_secret(console, "API Key", default=existing_key, allow_empty=bool(existing_key)).strip()
+        if not api_key:
+            console.print("[red]%s[/]" % ("API Key 不能为空。" if language == "zh" else "API key is required."))
+            continue
+        if not api_key.isascii() or any(ch.isspace() for ch in api_key):
+            console.print(
+                "[red]%s[/]"
+                % ("API Key 包含无效字符，请重新输入。" if language == "zh" else "API key contains invalid characters.")
+            )
+            continue
         env_values[env_key] = api_key
+        break
 
 
 def _configure_ollama(file_config: Dict[str, object], env_values: Dict[str, str], language: str) -> None:

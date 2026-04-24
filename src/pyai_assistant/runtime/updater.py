@@ -49,7 +49,7 @@ class GitUpdater:
         venv_python = self.root / ".venv" / "Scripts" / "python.exe"
         python_executable = str(venv_python) if venv_python.exists() else sys.executable
         completed = self._run_process(
-            [python_executable, "-m", "pip", "install", "-e", "."],
+            [python_executable, "-m", "pip", "install", "-e", ".", "--no-build-isolation"],
             timeout=300,
         )
         if completed.returncode != 0:

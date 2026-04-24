@@ -2,7 +2,8 @@ param(
     [string]$PythonCommand = "python",
     [string]$Preset = "",
     [string]$ApiKey = "",
-    [switch]$NonInteractive
+    [switch]$NonInteractive,
+    [switch]$SkipGlobalLauncher
 )
 
 $ErrorActionPreference = "Stop"
@@ -10,9 +11,22 @@ $ErrorActionPreference = "Stop"
 $InstallRoot = (Resolve-Path $PSScriptRoot).Path
 $LauncherDir = if ($env:EASYAI_LAUNCHER_DIR) { $env:EASYAI_LAUNCHER_DIR } else { (Get-Location).Path }
 $UserBin = Join-Path $env:LOCALAPPDATA "EasyAI\bin"
+$UserStateDir = Join-Path $env:LOCALAPPDATA "EasyAI"
+$InstallRootFile = Join-Path $UserStateDir "install-root.txt"
 $VenvPython = Join-Path $InstallRoot ".venv\Scripts\python.exe"
 $VenvPip = Join-Path $InstallRoot ".venv\Scripts\pip.exe"
 $VenvEasyAI = Join-Path $InstallRoot ".venv\Scripts\easyai.exe"
+$Utf8NoBom = New-Object System.Text.UTF8Encoding($false)
+
+function Write-Utf8NoBomFile($Path, $Text) {
+    [System.IO.File]::WriteAllText($Path, $Text, $Utf8NoBom)
+}
+
+function Assert-LastExitCode($Message) {
+    if ($LASTEXITCODE -ne 0) {
+        throw $Message
+    }
+}
 
 function Write-Section($Text) {
     Write-Host ""
@@ -101,8 +115,10 @@ if (-not (Test-Path $VenvPython)) {
     & $PythonCommand -m venv (Join-Path $InstallRoot ".venv")
 }
 
-& $VenvPython -m pip install --upgrade pip
-& $VenvPip install -e $InstallRoot
+& $VenvPython -m pip install --upgrade pip setuptools wheel
+Assert-LastExitCode "Failed to upgrade pip/setuptools/wheel."
+& $VenvPip install -e $InstallRoot --no-build-isolation
+Assert-LastExitCode "Failed to install EasyAI client."
 
 $selectedPreset = Select-Preset -Requested $Preset
 $presetConfig = Preset-Config -Name $selectedPreset
@@ -127,7 +143,7 @@ app_base_url: https://xingkongtech.top
 ollama_base_url: http://localhost:11434
 model_connection_configured: $modelConfigured
 "@
-$configText | Set-Content -Path $configPath -Encoding UTF8
+Write-Utf8NoBomFile -Path $configPath -Text $configText
 
 $envPath = Join-Path $InstallRoot ".env"
 $envLines = @(
@@ -142,28 +158,43 @@ if ($presetConfig.key_name -and $ApiKey) {
         if ($_.StartsWith("$($presetConfig.key_name)=")) { "$($presetConfig.key_name)=$ApiKey" } else { $_ }
     }
 }
-$envLines | Set-Content -Path $envPath -Encoding UTF8
-
-New-Item -ItemType Directory -Path $UserBin -Force | Out-Null
+$envText = ($envLines -join [Environment]::NewLine) + [Environment]::NewLine
+Write-Utf8NoBomFile -Path $envPath -Text $envText
 
 $launcher = @"
 @echo off
 setlocal
 "$VenvEasyAI" %*
 "@
-$launcher | Set-Content -Path (Join-Path $UserBin "easyai.cmd") -Encoding ASCII
-$launcher | Set-Content -Path (Join-Path $UserBin "Easyai.cmd") -Encoding ASCII
-$launcher | Set-Content -Path (Join-Path $InstallRoot "Easyai.cmd") -Encoding ASCII
-$launcher | Set-Content -Path (Join-Path $LauncherDir "easyai.cmd") -Encoding ASCII
-$launcher | Set-Content -Path (Join-Path $LauncherDir "Easyai.cmd") -Encoding ASCII
-
-Ensure-UserPath -PathToAdd $UserBin
+if (-not $SkipGlobalLauncher) {
+    New-Item -ItemType Directory -Path $UserStateDir -Force | Out-Null
+    New-Item -ItemType Directory -Path $UserBin -Force | Out-Null
+    Write-Utf8NoBomFile -Path $InstallRootFile -Text $InstallRoot
+    $globalLauncher = @'
+@echo off
+setlocal
+for /f "usebackq delims=" %%I in ("%LOCALAPPDATA%\EasyAI\install-root.txt") do set "EASYAI_ROOT=%%I"
+powershell -NoProfile -ExecutionPolicy Bypass -Command "& { & (Join-Path $env:EASYAI_ROOT '.venv\Scripts\python.exe') -m pyai_assistant.cli.client @args }" -- %*
+'@
+    $globalLauncher | Set-Content -Path (Join-Path $UserBin "easyai.cmd") -Encoding ASCII
+    $globalLauncher | Set-Content -Path (Join-Path $UserBin "Easyai.cmd") -Encoding ASCII
+    Ensure-UserPath -PathToAdd $UserBin
+}
+$localLauncher = @'
+@echo off
+setlocal
+powershell -NoProfile -ExecutionPolicy Bypass -Command "& { & '%~dp0.venv\Scripts\python.exe' -m pyai_assistant.cli.client @args }" -- %*
+'@
+$localLauncher | Set-Content -Path (Join-Path $InstallRoot "Easyai.cmd") -Encoding ASCII
+$localLauncher | Set-Content -Path (Join-Path $LauncherDir "easyai.cmd") -Encoding ASCII
+$localLauncher | Set-Content -Path (Join-Path $LauncherDir "Easyai.cmd") -Encoding ASCII
 
 $SelfTestWorkspace = Join-Path $env:TEMP "easyai-self-test-workspace"
 New-Item -ItemType Directory -Path $SelfTestWorkspace -Force | Out-Null
 Push-Location $SelfTestWorkspace
 try {
-    & (Join-Path $UserBin "easyai.cmd") --self-test
+    $SelfTestLauncher = if ($SkipGlobalLauncher) { (Join-Path $LauncherDir "easyai.cmd") } else { (Join-Path $UserBin "easyai.cmd") }
+    & $SelfTestLauncher --self-test
     if ($LASTEXITCODE -ne 0) {
         throw "EasyAI self-test failed."
     }

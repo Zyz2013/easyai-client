@@ -19,6 +19,7 @@ from rich.table import Table
 from pyai_assistant.agent.session import AssistantAgent
 from pyai_assistant.cli.model_setup import ensure_model_connection
 from pyai_assistant.cli.pet import TerminalPet
+from pyai_assistant.cli.secret_input import prompt_secret
 from pyai_assistant.config import load_config, load_local_config_files, write_local_config
 from pyai_assistant.providers.factory import build_provider
 from pyai_assistant.providers.server_api import (
@@ -641,7 +642,7 @@ class EasyAIClient:
             return
         self.console.print(self._t("first_login"))
         username = Prompt.ask(self._t("username"))
-        password = Prompt.ask(self._t("password"), password=True)
+        password = prompt_secret(self.console, self._t("password"))
         try:
             payload = self.api.login(username, password, self.computer.name)
         except Exception as exc:

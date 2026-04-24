@@ -25,7 +25,8 @@ def post_json(url: str, payload: Dict[str, object], headers: Optional[Dict[str, 
             body = response.read().decode("utf-8")
     except error.HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
-        raise HttpError("HTTP %s: %s" % (exc.code, body))
+        detail = body.strip() or "empty response body"
+        raise HttpError("HTTP %s from %s: %s" % (exc.code, url, detail))
     except error.URLError as exc:
         raise HttpError("Network error: %s" % exc.reason)
 
