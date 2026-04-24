@@ -110,8 +110,8 @@ class SoftwareDownloader:
 
     def winget_search(self, query: str) -> DownloadResult:
         command = ["winget", "search", query]
-        completed = subprocess.run(command, capture_output=True, text=True, timeout=60)
-        output = completed.stdout.strip() or completed.stderr.strip()
+        completed = self._run_process(command, timeout=60)
+        output = self._process_output(completed)
         if completed.returncode != 0:
             raise RuntimeError(output or "winget search failed.")
         return DownloadResult(message=output, command=command)
@@ -119,7 +119,7 @@ class SoftwareDownloader:
     def is_installed(self, query: str) -> bool:
         package_id = self.resolve_package_id(query)
         command = ["winget", "list", "--id", package_id, "--exact"]
-        completed = subprocess.run(command, capture_output=True, text=True, timeout=60)
+        completed = self._run_process(command, timeout=60)
         output = (completed.stdout or "") + "\n" + (completed.stderr or "")
         lowered = output.lower()
         if completed.returncode == 0 and package_id.lower() in lowered:
@@ -166,8 +166,8 @@ class SoftwareDownloader:
             subprocess.run(powershell_command, timeout=600)
             return DownloadResult(message="Installer launched with administrator privileges.", command=powershell_command)
 
-        completed = subprocess.run(command, capture_output=True, text=True, timeout=600)
-        output = completed.stdout.strip() or completed.stderr.strip()
+        completed = self._run_process(command, timeout=600)
+        output = self._process_output(completed)
         if completed.returncode != 0:
             raise RuntimeError(output or "winget install failed.")
         return DownloadResult(message=output or "Install completed.", command=command)
@@ -185,3 +185,18 @@ class SoftwareDownloader:
         parsed = urllib.parse.urlparse(url)
         name = Path(urllib.parse.unquote(parsed.path)).name
         return name or "download.bin"
+
+    def _run_process(self, command: List[str], timeout: int) -> subprocess.CompletedProcess:
+        return subprocess.run(
+            command,
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+        )
+
+    def _process_output(self, completed: subprocess.CompletedProcess) -> str:
+        stdout = completed.stdout or ""
+        stderr = completed.stderr or ""
+        return stdout.strip() or stderr.strip()
