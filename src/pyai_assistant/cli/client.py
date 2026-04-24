@@ -89,6 +89,9 @@ TEXT = {
         "help": "帮助",
         "client_title": "EasyAI 客户端",
         "help_title": "帮助",
+        "help_topics_line": "可用主题: files, run, pet, download, account, permission, agent",
+        "help_examples_title": "常用示例",
+        "help_unknown_topic": "未知帮助主题: {topic}",
         "update_check": "正在检查更新...",
         "update_unavailable": "无法自动检查更新:",
         "update_available": "发现新版本 {local} -> {remote}，是否现在更新？",
@@ -96,29 +99,31 @@ TEXT = {
         "update_failed": "更新失败:",
         "update_none": "已是最新版本。",
         "help_short": """\
-帮助主题
-  /help files       文件/上下文：列文件、打开文件、添加/移除上下文、重置
-  /help run         验证执行：Python、pytest、Node、npm/pnpm/yarn/bun test
-  /help pet         宠物：状态、开启、关闭
-  /help download    下载/安装：URL、winget 搜索、确认后安装
-  /help account     账号、模型来源、模型、模式、退出登录
-  /help permission  权限模式与切换
-  /help agent       状态、诊断、初始化、记忆、压缩、审查、自定义命令
-  /language zh|en   切换语言
+帮助
+  /help files       文件与上下文
+  /help run         运行与验证
+  /help pet         宠物功能
+  /help download    下载与安装
+  /help account     账号、模型、语言
+  /help permission  权限模式
+  /help agent       状态、记忆、计划、审查
 
-常用流程
+可用主题: files, run, pet, download, account, permission, agent
+
+常用示例
   /permission files
-  /open <文件>
+  /open app.py
   /mode edit
   /apply
+  下载 VS Code
 """,
         "help_files": """\
 文件和上下文
-  /files                         列出可读取的代码/文本文件
-  /open <file>                   打开文件并加入上下文
-  /context add <file>            添加上下文文件
-  /context remove <file>         移除上下文文件
-  /reset                         清空会话、上下文和待应用修改
+  /files                  列出当前工作区可读取文件
+  /open <file>            打开文件并加入上下文
+  /context add <file>     手动加入上下文
+  /context remove <file>  从上下文移除
+  /reset                  清空会话、上下文、待应用修改
 """,
         "help_run": """\
 验证命令
@@ -128,66 +133,74 @@ TEXT = {
   /run node index.js
   /run npm test
 
-安全限制：不执行任意 shell。包管理器默认阻止 install/add/remove/publish/exec 等高风险动作。
+说明
+  只允许受控运行，不执行任意 shell
+  包管理器默认阻止 install/add/remove/publish/exec 等高风险动作
 """,
         "help_pet": """\
 宠物
-  /pet
-  /pet status
-  /pet on
-  /pet off
+  /pet         查看宠物卡片
+  /pet status  查看状态
+  /pet on      开启宠物
+  /pet off     关闭宠物
 """,
         "help_download": """\
 下载/安装
-  下载 Chrome
-  安装 VS Code
   /download chrome
-  /download https://example.com/file.exe
+  /download 微信
   /download chrome --install
   /download chrome --install --admin
+  下载 VS Code
+  安装 Python
 
-默认只下载到当前工作区 downloads/ 或搜索 winget。安装和管理员权限都会再次确认。
+说明
+  普通下载默认保存到当前工作区 downloads/
+  软件名会优先走 winget 搜索/安装流程
+  安装和管理员权限都会再次确认
 """,
         "help_account": """\
 账号/模型
-  /language zh|en                切换语言
-  /permission                    查看当前权限
-  /permission safe               安全模式：只允许聊天和服务端同步
-  /permission files              允许文件上下文、编辑和验证
-  /permission downloads          允许文件能力加下载/安装流程
-  /permission elevated           允许管理员安装提示，仍需额外确认
+  /language zh|en
   /provider openai_compatible
   /provider ollama
   /model <name>
   /mode chat|code|edit
   /logout
   /quit
+
+说明
+  语言、模型连接、权限都会保留旧配置
+  下次启动会优先询问是否继续使用旧配置
+  首次登录必须通过服务端验证
 """,
         "help_permission": """\
 权限模式
-  /permission                    查看当前模式
-  /permission safe               只允许聊天和服务端同步
-  /permission files              允许文件读取/编辑/应用和验证
-  /permission downloads          允许文件能力加下载/安装
-  /permission elevated           允许管理员安装提示，仍需额外确认
+  /permission            查看当前模式
+  /permission safe       仅聊天与服务端同步
+  /permission files      允许读写文件、应用修改、验证
+  /permission downloads  允许下载与安装流程
+  /permission elevated   允许管理员安装提示
 
-默认是 safe。高风险操作即使切换权限后仍会再次确认。
+说明
+  权限设置会保存，下次启动自动沿用
+  高风险操作即使已提权仍会再次确认
 """,
         "help_agent": """\
 Agent 工作区能力
-  /status                        查看会话、上下文、账号、权限、服务端状态
-  /doctor                        检查 Git、配置、API Key、Ollama、工作区文件
-  /init                          创建 AGENTS.md、.easyai/memory.md、自定义命令示例
-  /plan <task>                   只生成实施计划，不直接改文件
-  /memory                        查看项目记忆
-  /memory add <text>             追加项目记忆
-  # <text>                       快速追加记忆
-  /compact                       压缩旧会话，保留最近上下文
-  /review [focus]                对已加载上下文做代码审查
-  /commands                      列出 .easyai/commands/*.md 自定义命令
-  /<custom> [args]               执行 .easyai/commands/<custom>.md
+  /status         查看账号、模型、权限、上下文、服务器
+  /doctor         检查 Git、配置、API Key、Ollama、可见文件
+  /init           初始化 AGENTS.md 和 .easyai 工作区文件
+  /plan <task>    先生成计划，不直接改文件
+  /memory         查看项目记忆
+  /memory add ... 追加项目记忆
+  /compact        压缩旧对话
+  /review [focus] 审查已加载上下文
+  /commands       列出自定义命令
 
-自动读取项目规则文件：AGENTS.md、CLAUDE.md、EASYAI.md、.easyai/memory.md。
+说明
+  # <text> 等同于快速追加记忆
+  /<custom> [args] 可执行 .easyai/commands/<custom>.md
+  会自动读取 AGENTS.md、CLAUDE.md、EASYAI.md、.easyai/memory.md
 """,
         "permission_title": "权限",
         "loaded_context": "已加载上下文",
@@ -273,6 +286,9 @@ Agent 工作区能力
         "help": "Help",
         "client_title": "EasyAI Client",
         "help_title": "Help",
+        "help_topics_line": "Topics: files, run, pet, download, account, permission, agent",
+        "help_examples_title": "Common examples",
+        "help_unknown_topic": "Unknown help topic: {topic}",
         "update_check": "Checking for updates...",
         "update_unavailable": "Automatic update check unavailable:",
         "update_available": "Update available {local} -> {remote}. Update now?",
@@ -280,29 +296,31 @@ Agent 工作区能力
         "update_failed": "Update failed:",
         "update_none": "Already up to date.",
         "help_short": """\
-Help topics
-  /help files       Files/context: list, open, add/remove context, reset
-  /help run         Validation: Python, pytest, Node, npm/pnpm/yarn/bun test
-  /help pet         Pet: status, on, off
-  /help download    Download/install: URL, winget search, confirmed install
-  /help account     Server account, provider, model, mode, logout
-  /help permission  Permission modes and switching
-  /help agent       Status, doctor, init, memory, compact, review, custom commands
-  /language zh|en   Switch CLI language
+Help
+  /help files       Files and context
+  /help run         Run and validation
+  /help pet         Pet features
+  /help download    Download and install
+  /help account     Account, model, language
+  /help permission  Permission modes
+  /help agent       Status, memory, plan, review
 
-Common flow
+Topics: files, run, pet, download, account, permission, agent
+
+Common examples
   /permission files
-  /open <file>
+  /open app.py
   /mode edit
   /apply
+  download VS Code
 """,
         "help_files": """\
 Files and context
-  /files                         List readable code/text files
-  /open <file>                   Open and add file context
-  /context add <file>            Add context file
-  /context remove <file>         Remove context file
-  /reset                         Clear session, context, pending changes
+  /files                  List readable files in the current workspace
+  /open <file>            Open a file and load it into context
+  /context add <file>     Add context manually
+  /context remove <file>  Remove a context file
+  /reset                  Clear session, context, and pending changes
 """,
         "help_run": """\
 Validation commands
@@ -312,66 +330,74 @@ Validation commands
   /run node index.js
   /run npm test
 
-Safety: no arbitrary shell. Package managers block risky install/add/remove/publish/exec by default.
+Notes
+  Controlled execution only, no arbitrary shell
+  Package managers block risky install/add/remove/publish/exec by default
 """,
         "help_pet": """\
 Pet
-  /pet
-  /pet status
-  /pet on
-  /pet off
+  /pet         Show the pet card
+  /pet status  Show current state
+  /pet on      Enable the pet
+  /pet off     Disable the pet
 """,
         "help_download": """\
 Download/install
-  download Chrome
-  install VS Code
   /download chrome
-  /download https://example.com/file.exe
+  /download wechat
   /download chrome --install
   /download chrome --install --admin
+  download VS Code
+  install Python
 
-Default only downloads into workspace downloads/ or searches winget. Install and admin require confirmation.
+Notes
+  Plain downloads go into workspace downloads/
+  Software names use winget search/install flows
+  Install and admin actions always ask for confirmation
 """,
         "help_account": """\
 Account/model
-  /language zh|en                Switch CLI language
-  /permission                    Show current permission mode
-  /permission safe               Safe mode: chat + server sync only
-  /permission files              Allow file context/edit after confirmation
-  /permission downloads          Allow files + downloads/install after confirmation
-  /permission elevated           Allow downloads + admin actions after extra confirmation
+  /language zh|en
   /provider openai_compatible
   /provider ollama
   /model <name>
   /mode chat|code|edit
   /logout
   /quit
+
+Notes
+  Language, model connection, and permission keep the last saved config
+  Startup asks whether to keep the previous model config
+  First login must be verified by the server
 """,
         "help_permission": """\
 Permission modes
-  /permission                    Show current mode
-  /permission safe               Chat and server sync only
-  /permission files              Allow file read/edit/apply and validation
-  /permission downloads          Allow files plus download/install flows
-  /permission elevated           Allow admin install prompts after extra confirmation
+  /permission            Show current mode
+  /permission safe       Chat and server sync only
+  /permission files      Allow file read/edit/apply and validation
+  /permission downloads  Allow download and install flows
+  /permission elevated   Allow admin install prompts
 
-Default mode is safe. High-risk actions still ask for confirmation.
+Notes
+  Permission mode is saved and reused on next startup
+  High-risk actions still ask for confirmation
 """,
         "help_agent": """\
 Agent workspace features
-  /status                        Show session, context, account, permission, and server state
-  /doctor                        Check Git, config, API key, Ollama hint, and workspace files
-  /init                          Create AGENTS.md, .easyai/memory.md, and example custom commands
-  /plan <task>                   Ask for an implementation plan without applying changes
-  /memory                        Show project memory
-  /memory add <text>             Append project memory
-  # <text>                       Quick memory append, same as /memory add
-  /compact                       Summarize old chat turns and keep recent context
-  /review [focus]                Ask for a code-review style pass over loaded context
-  /commands                      List .easyai/commands/*.md custom commands
-  /<custom> [args]               Run a custom command prompt from .easyai/commands/<custom>.md
+  /status         Show account, model, permission, context, server
+  /doctor         Check Git, config, API key, Ollama, visible files
+  /init           Create AGENTS.md and .easyai workspace files
+  /plan <task>    Generate a plan first
+  /memory         Show project memory
+  /memory add ... Append project memory
+  /compact        Compact older chat turns
+  /review [focus] Review loaded context
+  /commands       List custom commands
 
-Project rule files loaded automatically: AGENTS.md, CLAUDE.md, EASYAI.md, .easyai/memory.md.
+Notes
+  # <text> is a quick memory shortcut
+  /<custom> [args] runs .easyai/commands/<custom>.md
+  Rule files are auto-loaded from AGENTS.md, CLAUDE.md, EASYAI.md, .easyai/memory.md
 """,
         "permission_title": "Permission",
         "loaded_context": "Loaded Context",
@@ -818,7 +844,14 @@ class EasyAIClient:
     def _show_help(self, topic: str = "") -> None:
         topic_key = topic.lower().strip()
         help_key = "help_%s" % topic_key if topic_key else "help_short"
-        text = self._t(help_key) if help_key in TEXT[self.language] else self._t("help_short")
+        if help_key in TEXT[self.language]:
+            text = self._t(help_key)
+        else:
+            text = "%s\n\n%s\n%s" % (
+                self._t("help_unknown_topic", topic=topic_key),
+                self._t("help_topics_line"),
+                self._t("help_short"),
+            )
         self.console.print(Panel(text.rstrip(), title=self._t("help_title"), border_style="cyan"))
 
     def _handle_permission(self, args: List[str]) -> None:
