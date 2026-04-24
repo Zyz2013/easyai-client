@@ -211,6 +211,8 @@ Agent 工作区能力
         "run_suggested_now": "现在运行建议的验证命令？",
         "run_suggested": "运行建议的验证命令？",
         "workspace_files": "工作区文件",
+        "workspace_current": "当前工作目录",
+        "workspace_switched": "工作目录已切换为",
         "status_title": "EasyAI 状态",
         "doctor_title": "EasyAI 诊断",
         "install_root": "安装目录",
@@ -409,6 +411,8 @@ Notes
         "run_suggested_now": "Run suggested validation now?",
         "run_suggested": "Run suggested validation command?",
         "workspace_files": "Workspace Files",
+        "workspace_current": "Current workspace",
+        "workspace_switched": "Workspace switched to",
         "status_title": "EasyAI Status",
         "doctor_title": "EasyAI Doctor",
         "install_root": "Install root",
@@ -908,6 +912,35 @@ Notes
     },
 }
 
+HELP_PAGES["zh"][""] = HELP_PAGES["zh"][""].replace(
+    "  2. /open app.py\n  3. /mode edit\n  4. 直接描述你要改什么\n  5. /apply\n  6. /run pytest tests",
+    "  2. /cd D:/MyProject\n  3. /open app.py\n  4. /mode edit\n  5. 直接描述你要改什么\n  6. /apply\n  7. /run pytest tests",
+)
+HELP_PAGES["zh"]["files"] = HELP_PAGES["zh"]["files"].replace(
+    "使用方法\n  /files",
+    "使用方法\n  /cd\n  /cd <目录路径>\n  /files",
+).replace(
+    "示例\n  /open src/app.py",
+    "示例\n  /cd D:/Projects/demo\n  /open src/app.py",
+).replace(
+    "说明\n  /open 会同时打开并加入上下文。",
+    "说明\n  /cd 会切换当前工作目录，并自动保存旧目录会话、加载新目录会话。\n  /open 会同时打开并加入上下文。",
+)
+HELP_PAGES["en"][""] = HELP_PAGES["en"][""].replace(
+    "  2. /open app.py\n  3. /mode edit\n  4. describe the change you want\n  5. /apply\n  6. /run pytest tests",
+    "  2. /cd D:/MyProject\n  3. /open app.py\n  4. /mode edit\n  5. describe the change you want\n  6. /apply\n  7. /run pytest tests",
+)
+HELP_PAGES["en"]["files"] = HELP_PAGES["en"]["files"].replace(
+    "How to use\n  /files",
+    "How to use\n  /cd\n  /cd <path>\n  /files",
+).replace(
+    "Examples\n  /open src/app.py",
+    "Examples\n  /cd D:/Projects/demo\n  /open src/app.py",
+).replace(
+    "Notes\n  /open both shows the file and adds it to context.",
+    "Notes\n  /cd switches the current workspace, saves the old workspace session, and restores the new one.\n  /open both shows the file and adds it to context.",
+)
+
 
 class EasyAIClient:
     def __init__(self, root: Path) -> None:
@@ -1184,6 +1217,14 @@ class EasyAIClient:
             save_client_session(self.app_root, self.session)
             self.console.print("[green]%s[/]" % self._t("language_set"))
             return False
+        if command == "/cd":
+            if len(parts) == 1:
+                self.console.print(
+                    Panel(str(self.root), title=self._t("workspace_current"), border_style="cyan")
+                )
+                return False
+            self._switch_workspace(" ".join(parts[1:]))
+            return False
         if command == "/download":
             self._handle_download_parts(parts[1:])
             return False
@@ -1413,6 +1454,36 @@ class EasyAIClient:
         for path in self.workspace.list_code_files():
             table.add_row(path.relative_to(self.root).as_posix())
         self.console.print(table)
+
+    def _switch_workspace(self, raw_path: str) -> None:
+        if not raw_path.strip():
+            raise ValueError("Workspace path is empty.")
+        target = Path(raw_path).expanduser()
+        if not target.is_absolute():
+            target = (self.root / target).resolve()
+        else:
+            target = target.resolve()
+        if not target.exists():
+            raise FileNotFoundError(str(target))
+        if not target.is_dir():
+            raise NotADirectoryError(str(target))
+
+        self._save_runtime_state()
+        self.root = target
+        self.workspace = WorkspaceManager(self.root)
+        self.runner = PythonRunner(self.workspace)
+        self.downloader = SoftwareDownloader(self.root)
+        self.easyai_dir = self.root / ".easyai"
+        self.memory_path = self.easyai_dir / "memory.md"
+        self.commands_dir = self.easyai_dir / "commands"
+        self.audit_path = self.easyai_dir / "audit.log"
+        self.runtime_state_path = self.easyai_dir / "runtime-state.json"
+        restored_state = self._load_runtime_state()
+        self.restored_runtime_state = self._has_runtime_state_data(restored_state)
+        self.agent.workspace = self.workspace
+        self.agent.state = restored_state
+        self._save_runtime_state()
+        self.console.print("[green]%s[/] %s" % (self._t("workspace_switched"), self.root))
 
     def _show_status(self) -> None:
         table = Table(title=self._t("status_title"))
