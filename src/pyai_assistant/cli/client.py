@@ -74,6 +74,7 @@ TEXT = {
         "download_empty": "请指定软件名或 URL。",
         "download_url": "确认下载 URL 到当前工作区 downloads/？",
         "downloaded": "下载完成:",
+        "already_installed": "软件已经安装。",
         "install_confirm": "确认使用 winget 安装 {query}？",
         "admin_confirm": "确认对 {query} 使用管理员权限？",
         "search_confirm": "确认用 winget 搜索 {query}？",
@@ -273,6 +274,7 @@ Agent 工作区能力
         "download_empty": "Specify software name or URL.",
         "download_url": "Download URL into workspace downloads/?",
         "downloaded": "Downloaded:",
+        "already_installed": "Software is already installed.",
         "install_confirm": "Install {query} with winget?",
         "admin_confirm": "Use administrator permission for {query}?",
         "search_confirm": "Search {query} with winget?",
@@ -1422,11 +1424,19 @@ class EasyAIClient:
         if install:
             if elevated:
                 self._require_permission("elevated")
+            if self.downloader.is_installed(query):
+                self.console.print("[yellow]%s[/]" % self._t("already_installed"))
+                self._audit("install.skip", {"query": query, "reason": "already_installed"})
+                return
             if not Confirm.ask(self._t("install_confirm", query=query), default=False):
                 return
             if elevated and not Confirm.ask(self._t("admin_confirm", query=query), default=False):
                 return
             result = self.downloader.winget_install(query, elevated=elevated, install_dir=install_dir)
+            if result.already_installed:
+                self.console.print("[yellow]%s[/]" % self._t("already_installed"))
+                self._audit("install.skip", {"query": query, "reason": "already_installed"})
+                return
             self._audit("install", {"query": query, "elevated": elevated, "install_dir": install_dir})
             self.console.print(Panel(result.message, title="Install", border_style="green"))
             return

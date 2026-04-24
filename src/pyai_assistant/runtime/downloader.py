@@ -40,6 +40,7 @@ class DownloadResult:
     message: str
     command: List[str]
     path: Optional[Path] = None
+    already_installed: bool = False
 
 
 def looks_like_download_request(text: str) -> bool:
@@ -115,8 +116,26 @@ class SoftwareDownloader:
             raise RuntimeError(output or "winget search failed.")
         return DownloadResult(message=output, command=command)
 
+    def is_installed(self, query: str) -> bool:
+        package_id = self.resolve_package_id(query)
+        command = ["winget", "list", "--id", package_id, "--exact"]
+        completed = subprocess.run(command, capture_output=True, text=True, timeout=60)
+        output = (completed.stdout or "") + "\n" + (completed.stderr or "")
+        lowered = output.lower()
+        if completed.returncode == 0 and package_id.lower() in lowered:
+            return True
+        if "no installed package found" in lowered:
+            return False
+        return False
+
     def winget_install(self, query: str, elevated: bool = False, install_dir: Optional[str] = None) -> DownloadResult:
         package_id = self.resolve_package_id(query)
+        if self.is_installed(query):
+            return DownloadResult(
+                message="Software is already installed.",
+                command=["winget", "list", "--id", package_id, "--exact"],
+                already_installed=True,
+            )
         command = [
             "winget",
             "install",
