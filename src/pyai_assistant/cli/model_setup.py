@@ -5,6 +5,7 @@ from typing import Dict, Tuple
 
 from rich.console import Console
 from rich.panel import Panel
+from rich.prompt import Confirm
 from rich.prompt import Prompt
 
 from pyai_assistant.config import load_config, load_local_config_files, write_dotenv, write_local_config
@@ -30,18 +31,42 @@ def has_model_connection(config: AppConfig) -> Tuple[bool, str]:
 
 def ensure_model_connection(root: Path, console: Console, language: str = "zh") -> AppConfig:
     config = load_config(root)
-    connected, _ = has_model_connection(config)
-    if connected:
-        return config
-
+    connected, reason = has_model_connection(config)
     file_config, env_values = load_local_config_files(root)
-    if file_config.get("model_connection_configured"):
+    configured_before = bool(file_config.get("model_connection_configured"))
+    if configured_before:
+        if language == "zh":
+            status = "可用" if connected else "不可用"
+            message = (
+                "检测到旧的模型连接配置。\n"
+                "当前状态: %s\n"
+                "详情: %s\n\n"
+                "是否继续使用旧配置？"
+            ) % (status, reason)
+            title = "模型连接"
+            prompt = "继续使用旧配置"
+        else:
+            status = "available" if connected else "unavailable"
+            message = (
+                "An existing model connection was found.\n"
+                "Current status: %s\n"
+                "Details: %s\n\n"
+                "Do you want to keep using the old configuration?"
+            ) % (status, reason)
+            title = "Model Connection"
+            prompt = "Use old configuration"
+
+        console.print(Panel(message, title=title, border_style="yellow"))
+        if Confirm.ask(prompt, default=True):
+            return config
+
+    if connected and not configured_before:
         return config
 
     if language == "zh":
         console.print(
             Panel(
-                "未检测到可用的 API Key 或本地 Ollama。请选择一种模型连接方式，保存后以后不会再自动弹出。",
+                "未检测到可用的 API Key 或本地 Ollama。请选择一种模型连接方式并保存。",
                 title="模型连接",
                 border_style="yellow",
             )
@@ -51,7 +76,7 @@ def ensure_model_connection(root: Path, console: Console, language: str = "zh") 
         console.print(
             Panel(
                 "No usable API key or local Ollama was detected. Choose a model connection. "
-                "After saving, this prompt will not appear again.",
+                "Save it to continue.",
                 title="Model Connection",
                 border_style="yellow",
             )
