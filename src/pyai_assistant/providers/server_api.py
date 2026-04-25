@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import socket
 from datetime import datetime
 import urllib.error
 import urllib.parse
@@ -93,6 +94,11 @@ class ServerApiClient:
                 retryable=retryable,
                 retry_after=retry_after,
             ) from exc
+        except socket.timeout as exc:
+            raise ServerApiError(0, "Network timeout: %s" % exc, retryable=True) from exc
+        except urllib.error.URLError as exc:
+            reason = exc.reason
+            raise ServerApiError(0, "Network error: %s" % reason, retryable=True) from exc
 
 
 def load_client_session(root: Path) -> Dict[str, Any]:
