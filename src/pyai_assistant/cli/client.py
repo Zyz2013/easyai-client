@@ -23,6 +23,7 @@ from pyai_assistant.cli.secret_input import prompt_secret
 from pyai_assistant.config import load_config, load_local_config_files, write_local_config
 from pyai_assistant.providers.factory import build_provider
 from pyai_assistant.providers.server_api import (
+    ServerApiError,
     ServerApiClient,
     clear_client_session,
     load_client_session,
@@ -1034,6 +1035,8 @@ class EasyAIClient:
         self.poller: Optional[threading.Thread] = None
         self.permission = self._load_saved_permission()
         self.language = "zh"
+        self.sync_retry_delay = 5
+        self.sync_error_signature: Optional[str] = None
 
     def run(self) -> None:
         self._choose_language()
@@ -1165,9 +1168,33 @@ class EasyAIClient:
                 task = payload.get("task")
                 if task:
                     self._handle_server_task(task)
+                self.sync_retry_delay = 5
+                self.sync_error_signature = None
             except Exception as exc:
-                self.console.print("[red]%s[/] %s" % (self._t("sync_error"), exc))
+                wait_seconds = self._handle_sync_error(exc)
+                self.stop_event.wait(wait_seconds)
+                continue
             self.stop_event.wait(5)
+
+    def _handle_sync_error(self, exc: Exception) -> int:
+        if isinstance(exc, ServerApiError) and exc.retryable:
+            wait_seconds = max(exc.retry_after or 0, min(self.sync_retry_delay * 2, 60), 5)
+            summary = str(exc)
+            if exc.retry_after:
+                summary = "%s (%ss)" % (summary, exc.retry_after)
+            signature = "retryable:%s:%s" % (wait_seconds, summary)
+            if signature != self.sync_error_signature:
+                self.console.print("[yellow]%s[/] %s" % (self._t("sync_error"), summary))
+                self.sync_error_signature = signature
+            self.sync_retry_delay = wait_seconds
+            return wait_seconds
+
+        signature = "error:%s" % str(exc)
+        if signature != self.sync_error_signature:
+            self.console.print("[red]%s[/] %s" % (self._t("sync_error"), exc))
+            self.sync_error_signature = signature
+        self.sync_retry_delay = 5
+        return 5
 
     def _handle_server_task(self, task: dict) -> None:
         prompt = str(task["prompt"])

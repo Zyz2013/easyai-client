@@ -9,6 +9,23 @@ from pathlib import Path
 from typing import Any, Dict, Optional
 
 
+class ServerApiError(RuntimeError):
+    def __init__(
+        self,
+        status_code: int,
+        message: str,
+        *,
+        details: Optional[Dict[str, Any]] = None,
+        retryable: bool = False,
+        retry_after: Optional[int] = None,
+    ) -> None:
+        super().__init__("Server API error %s: %s" % (status_code, message))
+        self.status_code = status_code
+        self.details = details or {}
+        self.retryable = retryable
+        self.retry_after = retry_after
+
+
 class ServerApiClient:
     def __init__(self, base_url: str, token: Optional[str] = None) -> None:
         self.base_url = base_url.rstrip("/")
@@ -54,7 +71,28 @@ class ServerApiClient:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             message = exc.read().decode("utf-8", errors="replace")
-            raise RuntimeError("Server API error %s: %s" % (exc.code, message)) from exc
+            details: Optional[Dict[str, Any]] = None
+            try:
+                parsed = json.loads(message)
+            except ValueError:
+                parsed = None
+            if isinstance(parsed, dict):
+                details = parsed
+                message = str(parsed.get("detail") or parsed.get("error") or message)
+            retry_after: Optional[int] = None
+            header_retry_after = exc.headers.get("Retry-After")
+            if header_retry_after and header_retry_after.isdigit():
+                retry_after = int(header_retry_after)
+            if details and isinstance(details.get("retry_after"), int):
+                retry_after = int(details["retry_after"])
+            retryable = bool(details.get("retryable")) if details else exc.code in {429, 502, 503, 504}
+            raise ServerApiError(
+                exc.code,
+                message,
+                details=details,
+                retryable=retryable,
+                retry_after=retry_after,
+            ) from exc
 
 
 def load_client_session(root: Path) -> Dict[str, Any]:
