@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import os
 import re
+import shutil
 import subprocess
 import urllib.parse
 import urllib.request
@@ -30,6 +32,7 @@ SOFTWARE_ALIASES = {
 @dataclass
 class DownloadRequest:
     query: str
+    action: str = "download"
     install: bool = False
     elevated: bool = False
     install_dir: Optional[str] = None
@@ -50,38 +53,51 @@ def looks_like_download_request(text: str) -> bool:
     return (
         normalized.startswith("download ")
         or normalized.startswith("install ")
-        or normalized.startswith("下载安装 ")
+        or normalized.startswith("uninstall ")
+        or normalized.startswith("remove ")
         or normalized.startswith("下载")
         or normalized.startswith("安装")
+        or normalized.startswith("卸载")
+        or normalized.startswith("删除")
         or "帮我下载" in normalized
         or "帮我安装" in normalized
+        or "帮我卸载" in normalized
+        or "帮我删除" in normalized
     )
 
 
 def parse_download_request(text: str) -> DownloadRequest:
     normalized = text.strip()
     lowered = normalized.lower()
-    install = (
-        lowered.startswith("install ")
-        or lowered.startswith("安装")
-        or lowered.startswith("下载安装")
-        or "帮我安装" in lowered
-    )
+
+    action = "download"
+    if lowered.startswith("install ") or lowered.startswith("安装") or "帮我安装" in lowered:
+        action = "install"
+    elif lowered.startswith("uninstall ") or lowered.startswith("remove ") or lowered.startswith("卸载") or lowered.startswith("删除") or "帮我卸载" in lowered or "帮我删除" in lowered:
+        action = "uninstall"
+
     elevated = any(token in lowered for token in ["--admin", "--elevated", "administrator", "管理员"])
 
     install_dir = None
-    english_match = re.search(r"\s+to\s+(.+)$", normalized, flags=re.I)
-    chinese_match = re.search(r"到\s*(.+)$", normalized)
-    target_match = english_match or chinese_match
-    if target_match:
-        install_dir = target_match.group(1).strip().strip("\"'")
-        normalized = normalized[: target_match.start()].strip()
+    if action == "install":
+        english_match = re.search(r"\s+to\s+(.+)$", normalized, flags=re.I)
+        chinese_match = re.search(r"到\s*(.+)$", normalized)
+        target_match = english_match or chinese_match
+        if target_match:
+            install_dir = target_match.group(1).strip().strip("\"'")
+            normalized = normalized[: target_match.start()].strip()
 
-    query = re.sub(r"^(please\s+)?(download|install)\s+", "", normalized, flags=re.I)
-    query = re.sub(r"^(帮我(下载|安装|下载安装))", "", query)
-    query = re.sub(r"^(下载|安装|下载安装)", "", query)
+    query = re.sub(r"^(please\s+)?(download|install|uninstall|remove)\s+", "", normalized, flags=re.I)
+    query = re.sub(r"^(帮我(下载|安装|卸载|删除))", "", query)
+    query = re.sub(r"^(下载|安装|卸载|删除)", "", query)
     query = query.replace("--admin", "").replace("--elevated", "").replace("管理员", "")
-    return DownloadRequest(query=query.strip(), install=install, elevated=elevated, install_dir=install_dir)
+    return DownloadRequest(
+        query=query.strip(),
+        action=action,
+        install=(action == "install"),
+        elevated=elevated,
+        install_dir=install_dir,
+    )
 
 
 class SoftwareDownloader:
@@ -120,12 +136,9 @@ class SoftwareDownloader:
         package_id = self.resolve_package_id(query)
         command = ["winget", "list", "--id", package_id, "--exact"]
         completed = self._run_process(command, timeout=60)
-        output = (completed.stdout or "") + "\n" + (completed.stderr or "")
-        lowered = output.lower()
-        if completed.returncode == 0 and package_id.lower() in lowered:
+        output = ((completed.stdout or "") + "\n" + (completed.stderr or "")).lower()
+        if completed.returncode == 0 and package_id.lower() in output:
             return True
-        if "no installed package found" in lowered:
-            return False
         return False
 
     def winget_install(self, query: str, elevated: bool = False, install_dir: Optional[str] = None) -> DownloadResult:
@@ -172,6 +185,49 @@ class SoftwareDownloader:
             raise RuntimeError(output or "winget install failed.")
         return DownloadResult(message=output or "Install completed.", command=command)
 
+    def winget_uninstall(self, query: str, elevated: bool = False) -> DownloadResult:
+        package_id = self.resolve_package_id(query)
+        if not self.is_installed(query):
+            return DownloadResult(message="Software is not installed.", command=["winget", "list", "--id", package_id, "--exact"])
+        command = ["winget", "uninstall", "--id", package_id, "--exact", "--accept-source-agreements"]
+        if elevated:
+            argument_list = "uninstall --id %s --exact --accept-source-agreements" % package_id
+            powershell_command = [
+                "powershell",
+                "-NoProfile",
+                "-Command",
+                "Start-Process",
+                "winget",
+                "-ArgumentList",
+                "'%s'" % argument_list,
+                "-Verb",
+                "RunAs",
+                "-Wait",
+            ]
+            subprocess.run(powershell_command, timeout=600)
+            return DownloadResult(message="Uninstaller launched with administrator privileges.", command=powershell_command)
+
+        completed = self._run_process(command, timeout=600)
+        output = self._process_output(completed)
+        if completed.returncode != 0:
+            raise RuntimeError(output or "winget uninstall failed.")
+        return DownloadResult(message=output or "Uninstall completed.", command=command)
+
+    def cleanup_residual_files(self, query: str) -> List[Path]:
+        cleaned: List[Path] = []
+        package_id = self.resolve_package_id(query)
+        for root in self._cleanup_roots():
+            for name in self._candidate_names(query, package_id):
+                target = root / name
+                if not target.exists():
+                    continue
+                if target.is_file():
+                    target.unlink()
+                else:
+                    shutil.rmtree(target)
+                cleaned.append(target)
+        return cleaned
+
     def _resolve_install_dir(self, raw_path: str) -> Path:
         target = Path(raw_path).expanduser()
         if not target.is_absolute():
@@ -185,6 +241,28 @@ class SoftwareDownloader:
         parsed = urllib.parse.urlparse(url)
         name = Path(urllib.parse.unquote(parsed.path)).name
         return name or "download.bin"
+
+    def _cleanup_roots(self) -> List[Path]:
+        candidates = {
+            os.environ.get("APPDATA"),
+            os.environ.get("LOCALAPPDATA"),
+            os.environ.get("PROGRAMDATA"),
+            str(Path.home() / "AppData" / "Roaming"),
+            str(Path.home() / "AppData" / "Local"),
+        }
+        return [Path(item) for item in candidates if item and Path(item).exists()]
+
+    def _candidate_names(self, query: str, package_id: str) -> List[str]:
+        raw = {query.strip(), package_id.strip()}
+        expanded = set()
+        for item in raw:
+            if not item:
+                continue
+            expanded.add(item)
+            expanded.add(item.replace(".", ""))
+            expanded.add(item.replace(".", " "))
+            expanded.add(item.split(".")[-1])
+        return sorted({item.strip().strip(".") for item in expanded if item.strip().strip(".")}, key=lambda value: (len(value), value.lower()), reverse=True)
 
     def _run_process(self, command: List[str], timeout: int) -> subprocess.CompletedProcess:
         return subprocess.run(

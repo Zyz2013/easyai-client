@@ -75,7 +75,11 @@ TEXT = {
         "download_url": "确认下载 URL 到当前工作区 downloads/？",
         "downloaded": "下载完成:",
         "already_installed": "软件已经安装。",
+        "not_installed": "软件未安装。",
         "install_confirm": "确认使用 winget 安装 {query}？",
+        "uninstall_confirm": "确认卸载 {query}？",
+        "cleanup_confirm": "确认继续清理 {query} 的常见残留文件？",
+        "cleanup_done": "残留清理完成:",
         "admin_confirm": "确认对 {query} 使用管理员权限？",
         "search_confirm": "确认用 winget 搜索 {query}？",
         "no_pending": "没有待应用修改。",
@@ -275,7 +279,11 @@ Agent 工作区能力
         "download_url": "Download URL into workspace downloads/?",
         "downloaded": "Downloaded:",
         "already_installed": "Software is already installed.",
+        "not_installed": "Software is not installed.",
         "install_confirm": "Install {query} with winget?",
+        "uninstall_confirm": "Uninstall {query}?",
+        "cleanup_confirm": "Continue cleaning common residual files for {query}?",
+        "cleanup_done": "Residual cleanup finished:",
         "admin_confirm": "Use administrator permission for {query}?",
         "search_confirm": "Search {query} with winget?",
         "no_pending": "No pending changes.",
@@ -931,11 +939,13 @@ HELP_PAGES["zh"]["files"] = HELP_PAGES["zh"]["files"].replace(
 HELP_PAGES["zh"]["download"] = """\
 下载与安装
 作用
-  下载文件，或直接用自然语言安装软件。默认安装走系统默认目录，也支持指定自定义目录。
+  下载文件，或直接用自然语言安装、卸载软件。安装支持默认目录或自定义目录；卸载后可继续清理常见残留目录。
 
 使用方法
   安装 某个软件
   安装 某个软件 到 某个目录
+  卸载 某个软件
+  删除 某个软件
   /download <软件名> --install
   /download <软件名> --install --to <目录>
   /download <URL>
@@ -944,12 +954,15 @@ HELP_PAGES["zh"]["download"] = """\
   安装 VS Code
   安装 Python 到 D:/Apps/Python
   安装 Chrome 到 D:/Portable/Chrome
+  卸载 VS Code
   /download python --install --to D:/Apps/Python
 
 说明
   直接说“安装某某软件”时，会默认安装到系统默认目录。
   直接说“安装某某软件到某个目录”时，会把该目录作为安装位置传给 winget。
-  安装和管理员权限操作仍然会再次确认。
+  卸载会先走 winget uninstall，再询问是否清理常见残留目录。
+  不会承诺 100% 零残留，但会在受控范围内尽量清干净。
+  安装、卸载和管理员权限操作仍然会再次确认。
 """
 HELP_PAGES["en"][""] = HELP_PAGES["en"][""].replace(
     "  2. /open app.py\n  3. /mode edit\n  4. describe the change you want\n  5. /apply\n  6. /run pytest tests",
@@ -968,11 +981,13 @@ HELP_PAGES["en"]["files"] = HELP_PAGES["en"]["files"].replace(
 HELP_PAGES["en"]["download"] = """\
 Download and install
 Purpose
-  Download files or install software directly with natural language. Plain install uses the default system location, and a custom target directory is also supported.
+  Download files or install or uninstall software directly with natural language. Install supports the default system location or a custom target directory. Uninstall can also clean common residual folders.
 
 How to use
   install <software name>
   install <software name> to <directory>
+  uninstall <software name>
+  remove <software name>
   /download <software name> --install
   /download <software name> --install --to <directory>
   /download <URL>
@@ -981,12 +996,15 @@ Examples
   install VS Code
   install Python to D:/Apps/Python
   install Chrome to D:/Portable/Chrome
+  uninstall VS Code
   /download python --install --to D:/Apps/Python
 
 Notes
   Saying "install <software>" uses the default system install location.
   Saying "install <software> to <directory>" passes that directory to winget as the install location.
-  Install and admin actions still ask for confirmation.
+  Uninstall first runs winget uninstall, then asks whether to clean common residual folders.
+  EasyAI does not claim a guaranteed 100% zero-residue uninstall, but it does controlled cleanup of common leftover paths.
+  Install, uninstall, and admin actions still ask for confirmation.
 """
 
 
@@ -1401,22 +1419,24 @@ class EasyAIClient:
     def _handle_download_text(self, text: str) -> None:
         self._require_permission("downloads")
         request = parse_download_request(text)
-        self._perform_download(request.query, request.install, request.elevated, request.install_dir)
+        self._perform_download(request.query, request.action, request.elevated, request.install_dir)
 
     def _handle_download_parts(self, args: List[str]) -> None:
         self._require_permission("downloads")
         install = "--install" in args
+        uninstall = "--uninstall" in args or "--remove" in args
         elevated = "--admin" in args or "--elevated" in args
+        action = "install" if install else "uninstall" if uninstall else "download"
         install_dir = None
-        cleaned_args = [item for item in args if item not in {"--install", "--admin", "--elevated"}]
+        cleaned_args = [item for item in args if item not in {"--install", "--uninstall", "--remove", "--admin", "--elevated"}]
         if "--to" in cleaned_args:
             marker_index = cleaned_args.index("--to")
             install_dir = " ".join(cleaned_args[marker_index + 1 :]).strip() or None
             cleaned_args = cleaned_args[:marker_index]
         query = " ".join(cleaned_args).strip()
-        self._perform_download(query, install, elevated, install_dir)
+        self._perform_download(query, action, elevated, install_dir)
 
-    def _perform_download(self, query: str, install: bool, elevated: bool, install_dir: Optional[str] = None) -> None:
+    def _perform_download(self, query: str, action: str, elevated: bool, install_dir: Optional[str] = None) -> None:
         if not query:
             raise ValueError(self._t("download_empty"))
         if self.downloader.is_url(query):
@@ -1425,7 +1445,7 @@ class EasyAIClient:
                 self._audit("download", {"query": query, "path": str(result.path)})
                 self.console.print("[green]%s[/] %s" % (self._t("downloaded"), result.path))
             return
-        if install:
+        if action == "install":
             if elevated:
                 self._require_permission("elevated")
             if self.downloader.is_installed(query):
@@ -1443,6 +1463,28 @@ class EasyAIClient:
                 return
             self._audit("install", {"query": query, "elevated": elevated, "install_dir": install_dir})
             self.console.print(Panel(result.message, title="Install", border_style="green"))
+            return
+        if action == "uninstall":
+            if elevated:
+                self._require_permission("elevated")
+            if not self.downloader.is_installed(query):
+                self.console.print("[yellow]%s[/]" % self._t("not_installed"))
+                self._audit("uninstall.skip", {"query": query, "reason": "not_installed"})
+                return
+            if not Confirm.ask(self._t("uninstall_confirm", query=query), default=False):
+                return
+            if elevated and not Confirm.ask(self._t("admin_confirm", query=query), default=False):
+                return
+            result = self.downloader.winget_uninstall(query, elevated=elevated)
+            self._audit("uninstall", {"query": query, "elevated": elevated})
+            self.console.print(Panel(result.message, title="Uninstall", border_style="green"))
+            if Confirm.ask(self._t("cleanup_confirm", query=query), default=True):
+                cleaned = self.downloader.cleanup_residual_files(query)
+                self._audit("cleanup", {"query": query, "paths": [str(path) for path in cleaned]})
+                if cleaned:
+                    self.console.print("[green]%s[/] %s" % (self._t("cleanup_done"), ", ".join(str(path) for path in cleaned)))
+                else:
+                    self.console.print("[yellow]%s[/]" % self._t("cleanup_done"))
             return
         if Confirm.ask(self._t("search_confirm", query=query), default=True):
             result = self.downloader.winget_search(query)
