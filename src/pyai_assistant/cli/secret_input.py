@@ -28,13 +28,24 @@ def prompt_secret(console: Console, label: str, default: str = "", allow_empty: 
                 break
             if key == "\003":
                 raise KeyboardInterrupt()
-            if key == "\b":
+            if key in ("\b", "\x08", "\x7f"):
                 if chars:
                     chars.pop()
                     console.print("\b \b", end="")
                 continue
+            if key == "\x15":
+                while chars:
+                    chars.pop()
+                    console.print("\b \b", end="")
+                continue
             if key in ("\x00", "\xe0"):
-                msvcrt.getwch()
+                special = msvcrt.getwch()
+                if special == "S":
+                    if chars:
+                        chars.pop()
+                        console.print("\b \b", end="")
+                continue
+            if ord(key) < 32:
                 continue
             chars.append(key)
             console.print("*", end="")
