@@ -61,7 +61,7 @@ def load_client_session(root: Path) -> Dict[str, Any]:
     path = root / "easyai-data" / "client_session.json"
     if not path.exists():
         return {}
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
 def save_client_session(root: Path, payload: Dict[str, Any]) -> None:

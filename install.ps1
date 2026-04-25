@@ -170,11 +170,16 @@ if (-not $SkipGlobalLauncher) {
     New-Item -ItemType Directory -Path $UserStateDir -Force | Out-Null
     New-Item -ItemType Directory -Path $UserBin -Force | Out-Null
     Write-Utf8NoBomFile -Path $InstallRootFile -Text $InstallRoot
+    $globalPsLauncher = @'
+$root = [System.IO.File]::ReadAllText(($env:LOCALAPPDATA + '\EasyAI\install-root.txt'), [System.Text.Encoding]::UTF8).Trim()
+& (Join-Path $root '.venv\Scripts\python.exe') -m pyai_assistant.cli.client @args
+exit $LASTEXITCODE
+'@
+    Write-Utf8NoBomFile -Path (Join-Path $UserBin "easyai-launch.ps1") -Text $globalPsLauncher
     $globalLauncher = @'
 @echo off
 setlocal
-for /f "usebackq delims=" %%I in ("%LOCALAPPDATA%\EasyAI\install-root.txt") do set "EASYAI_ROOT=%%I"
-powershell -NoProfile -ExecutionPolicy Bypass -Command "& { & (Join-Path $env:EASYAI_ROOT '.venv\Scripts\python.exe') -m pyai_assistant.cli.client @args }" -- %*
+powershell -NoProfile -ExecutionPolicy Bypass -File "%LOCALAPPDATA%\EasyAI\bin\easyai-launch.ps1" %*
 '@
     $globalLauncher | Set-Content -Path (Join-Path $UserBin "easyai.cmd") -Encoding ASCII
     $globalLauncher | Set-Content -Path (Join-Path $UserBin "Easyai.cmd") -Encoding ASCII
