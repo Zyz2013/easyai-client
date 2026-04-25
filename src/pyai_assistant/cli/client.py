@@ -1008,6 +1008,15 @@ Notes
   Install, uninstall, and admin actions still ask for confirmation.
 """
 
+HELP_PAGES["zh"]["account"] = HELP_PAGES["zh"]["account"].replace(
+    "  首次登录必须通过服务端验证。",
+    "  首次登录必须通过服务端验证。\n  如果使用 cpl / CLIProxyAPI，默认可优先选择这些模型：gpt-image-2、gpt-5.4、gpt-5.5。",
+)
+HELP_PAGES["en"]["account"] = HELP_PAGES["en"]["account"].replace(
+    "  The first login must be verified by the server.",
+    "  The first login must be verified by the server.\n  If you use cpl / CLIProxyAPI, the recommended model choices are gpt-image-2, gpt-5.4, and gpt-5.5.",
+)
+
 
 class EasyAIClient:
     def __init__(self, root: Path) -> None:

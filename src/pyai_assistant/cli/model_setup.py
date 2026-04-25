@@ -5,14 +5,16 @@ from typing import Dict, Tuple
 
 from rich.console import Console
 from rich.panel import Panel
-from rich.prompt import Confirm
-from rich.prompt import Prompt
+from rich.prompt import Confirm, Prompt
 
 from pyai_assistant.cli.secret_input import prompt_secret
 from pyai_assistant.config import load_config, load_local_config_files, write_dotenv, write_local_config
 from pyai_assistant.presets import get_api_preset
 from pyai_assistant.providers.http import get_json
+from pyai_assistant.providers.openai_compatible import allows_empty_api_key
 from pyai_assistant.types import AppConfig
+
+CLI_PROXY_API_MODELS = ["gpt-image-2", "gpt-5.4", "gpt-5.5"]
 
 
 def has_model_connection(config: AppConfig) -> Tuple[bool, str]:
@@ -23,11 +25,11 @@ def has_model_connection(config: AppConfig) -> Tuple[bool, str]:
             return False, "Ollama is not reachable: %s" % exc
         return True, "Ollama is reachable."
 
-    if not config.api_key:
+    if not config.api_key and not allows_empty_api_key(config.base_url):
         return False, "API key is missing."
     if not config.base_url or not config.model:
         return False, "API base URL or model is missing."
-    if not config.api_key.isascii() or any(ch.isspace() for ch in config.api_key):
+    if config.api_key and (not config.api_key.isascii() or any(ch.isspace() for ch in config.api_key)):
         return False, "API key contains invalid characters."
     return True, "API configuration exists."
 
@@ -78,8 +80,7 @@ def ensure_model_connection(root: Path, console: Console, language: str = "zh") 
     else:
         console.print(
             Panel(
-                "No usable API key or local Ollama was detected. Choose a model connection. "
-                "Save it to continue.",
+                "No usable API key or local Ollama was detected. Choose a model connection. Save it to continue.",
                 title="Model Connection",
                 border_style="yellow",
             )
@@ -100,15 +101,21 @@ def ensure_model_connection(root: Path, console: Console, language: str = "zh") 
 def _configure_api(console: Console, file_config: Dict[str, object], env_values: Dict[str, str], language: str) -> None:
     preset_choice = Prompt.ask(
         "API preset / API 预设" if language == "zh" else "API preset",
-        choices=["deepseek", "openrouter", "openai", "custom"],
+        choices=["cpl", "deepseek", "openrouter", "openai", "custom"],
         default=str(file_config.get("preset", "deepseek")),
     )
 
     if preset_choice == "custom":
         file_config["preset"] = ""
         file_config["provider"] = "openai_compatible"
-        file_config["base_url"] = Prompt.ask("Base URL", default=str(file_config.get("base_url", "")) or "https://api.openai.com/v1")
-        file_config["model"] = Prompt.ask("Model", default=str(file_config.get("model", "")) or "gpt-4o-mini")
+        file_config["base_url"] = Prompt.ask(
+            "Base URL",
+            default=str(file_config.get("base_url", "")) or "https://api.openai.com/v1",
+        )
+        file_config["model"] = Prompt.ask(
+            "Model",
+            default=str(file_config.get("model", "")) or "gpt-4o-mini",
+        )
         env_key = "OPENAI_COMPATIBLE_API_KEY"
     else:
         preset = get_api_preset(preset_choice)
@@ -117,16 +124,43 @@ def _configure_api(console: Console, file_config: Dict[str, object], env_values:
         file_config["preset"] = preset.name
         file_config["provider"] = preset.provider
         file_config["base_url"] = preset.base_url
-        file_config["model"] = Prompt.ask("Model / 模型" if language == "zh" else "Model", default=preset.default_model)
+        if preset.name == "cpl":
+            if language == "zh":
+                console.print("[cyan]CLIProxyAPI 推荐可选模型:[/] %s" % " / ".join(CLI_PROXY_API_MODELS))
+            else:
+                console.print("[cyan]Recommended CLIProxyAPI models:[/] %s" % " / ".join(CLI_PROXY_API_MODELS))
+            model_choice = Prompt.ask(
+                "选择模型 / Model" if language == "zh" else "Choose a model",
+                choices=CLI_PROXY_API_MODELS + ["custom"],
+                default="gpt-5.4",
+            )
+            if model_choice == "custom":
+                file_config["model"] = Prompt.ask(
+                    "自定义模型 / Custom model" if language == "zh" else "Custom model",
+                    default=preset.default_model,
+                )
+            else:
+                file_config["model"] = model_choice
+        else:
+            file_config["model"] = Prompt.ask(
+                "Model / 模型" if language == "zh" else "Model",
+                default=preset.default_model,
+            )
         env_key = preset.api_key_env or "OPENAI_COMPATIBLE_API_KEY"
 
     existing_key = env_values.get(env_key, "").strip()
+    allow_empty_key = allows_empty_api_key(str(file_config.get("base_url", "")))
     while True:
-        api_key = prompt_secret(console, "API Key", default=existing_key, allow_empty=bool(existing_key)).strip()
-        if not api_key:
+        api_key = prompt_secret(
+            console,
+            "API Key",
+            default=existing_key,
+            allow_empty=allow_empty_key or bool(existing_key),
+        ).strip()
+        if not api_key and not allow_empty_key:
             console.print("[red]%s[/]" % ("API Key 不能为空。" if language == "zh" else "API key is required."))
             continue
-        if not api_key.isascii() or any(ch.isspace() for ch in api_key):
+        if api_key and (not api_key.isascii() or any(ch.isspace() for ch in api_key)):
             console.print(
                 "[red]%s[/]"
                 % ("API Key 包含无效字符，请重新输入。" if language == "zh" else "API key contains invalid characters.")
@@ -141,7 +175,10 @@ def _configure_ollama(file_config: Dict[str, object], env_values: Dict[str, str]
         "Ollama URL",
         default=str(file_config.get("ollama_base_url", env_values.get("OLLAMA_BASE_URL", "http://localhost:11434"))),
     )
-    model = Prompt.ask("Ollama model / Ollama 模型" if language == "zh" else "Ollama model", default=str(file_config.get("model", "qwen2.5-coder:7b")))
+    model = Prompt.ask(
+        "Ollama model / Ollama 模型" if language == "zh" else "Ollama model",
+        default=str(file_config.get("model", "qwen2.5-coder:7b")),
+    )
     file_config["preset"] = "ollama"
     file_config["provider"] = "ollama"
     file_config["base_url"] = base_url

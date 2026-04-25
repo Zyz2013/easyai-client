@@ -15,6 +15,14 @@ class ApiPreset:
 
 
 API_PRESETS: Dict[str, ApiPreset] = {
+    "cpl": ApiPreset(
+        name="cpl",
+        provider="openai_compatible",
+        base_url="http://127.0.0.1:8317/v1",
+        default_model="gpt-4o-mini",
+        api_key_env="OPENAI_COMPATIBLE_API_KEY",
+        description="CLIProxyAPI 本地 OpenAI-compatible 代理",
+    ),
     "openai": ApiPreset(
         name="openai",
         provider="openai_compatible",
