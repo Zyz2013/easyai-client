@@ -31,6 +31,7 @@ class ServerApiClient:
     def __init__(self, base_url: str, token: Optional[str] = None) -> None:
         self.base_url = base_url.rstrip("/")
         self.token = token
+        self.opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
 
     def login(self, username: str, password: str, device_name: str) -> Dict[str, Any]:
         return self._request(
@@ -68,7 +69,7 @@ class ServerApiClient:
             headers["Authorization"] = "Bearer %s" % self.token
         request = urllib.request.Request(self.base_url + path, data=body, headers=headers, method=method)
         try:
-            with urllib.request.urlopen(request, timeout=60) as response:
+            with self.opener.open(request, timeout=60) as response:
                 return json.loads(response.read().decode("utf-8"))
         except urllib.error.HTTPError as exc:
             message = exc.read().decode("utf-8", errors="replace")
