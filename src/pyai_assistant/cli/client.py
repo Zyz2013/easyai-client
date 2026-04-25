@@ -1191,7 +1191,7 @@ class EasyAIClient:
             summary = str(exc)
             if exc.retry_after:
                 summary = "%s (%ss)" % (summary, exc.retry_after)
-            signature = "retryable:%s:%s" % (wait_seconds, summary)
+            signature = "retryable:%s" % str(exc)
             if signature != self.sync_error_signature:
                 self.console.print("[yellow]%s[/] %s" % (self._t("sync_error"), summary))
                 self.sync_error_signature = signature
